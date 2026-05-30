@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jarvis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- AMENDED: init modal unchanged -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title"><span>JARVIS</span> // INIT</div>
+    <p class="modal-sub">
+      Running on your local machine via Ollama. Make sure Ollama is running and llama3.2 is downloaded before clicking initialize.
+    </p>
+    <button class="modal-btn" id="key-submit">INITIALIZE JARVIS</button>
+  </div>
+</div>
+
+<!-- AMENDED: entire app structure replaced. old header+messages+sidebar+input
+     is now two layers: the jarvis-screen (circle) and chat-panel (slides in from right) -->
+<div class="jarvis-screen" id="jarvis-screen">
+
+  <!-- AMENDED: circle orb with three rings that animate based on state -->
+  <div class="orb-wrapper" id="orb-wrapper">
+    <div class="orb-ring orb-ring-outer" id="orb-outer"></div>
+    <div class="orb-ring orb-ring-inner"></div>
+    <div class="orb-core">
+      <span class="orb-label">JARVIS</span>
+    </div>
+  </div>
+
+  <!-- AMENDED: status text sits below the circle -->
+  <div class="orb-status" id="orb-status">IDLE</div>
+    <!-- Subtitle display: user question and Jarvis sentence -->
+    <div class="subtitle-area">
+      <div class="subtitle-user"  id="subtitle-user"></div>
+      <div class="subtitle-jarvis" id="subtitle-jarvis"></div>
+    </div>
+  <!-- AMENDED: bottom bar holds mic, text input, and chat toggle -->
+  <div class="orb-bar">
+    <button class="orb-btn mic-btn" id="mic-btn" disabled title="Click to speak">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="1" width="6" height="9" rx="3"/>
+        <path d="M2 8a6 6 0 0012 0M8 14v2"/>
+      </svg>
+    </button>
+    <div class="orb-input-wrap">
+      <textarea id="input" rows="1" placeholder="Ask Jarvis anything..." disabled></textarea>
+      <button class="send-btn" id="send-btn" disabled>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 8h10M9 4l4 4-4 4"/>
+        </svg>
+      </button>
+    </div>
+    <!-- AMENDED: new toggle button to open/close chat panel -->
+    <button class="orb-btn chat-toggle-btn" id="chat-toggle" disabled title="Toggle chat">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 10c0 .667-.333 1-1 1H4l-3 3V3c0-.667.333-1 1-1h11c.667 0 1 .333 1 1v7z"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="hint">
+    <span>ENTER to send</span>
+    <span style="opacity:0.4">·</span>
+    <span>SHIFT+ENTER for newline</span>
+    <span style="opacity:0.4">·</span>
+    <span>MIC to speak</span>
+  </div>
+</div>
+
+<!-- AMENDED: chat panel slides in from the right, toggled by the button above -->
+<div class="chat-panel" id="chat-panel">
+  <div class="chat-panel-header">
+    <span class="chat-panel-title">CHAT LOG</span>
+    <!-- memory badge -->
+    <span class="memory-count" id="memory-count">0</span>
+    <span class="chat-panel-title" style="margin-left:4px">MEM</span>
+    <button class="chat-close-btn" id="chat-close">×</button>
+  </div>
+
+  <!-- messages scroll area -->
+  <div class="messages" id="messages">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-title">Hello. I'm <span>Jarvis</span>.</div>
+      <p class="empty-sub">Type or speak. Tell me to remember anything important.</p>
+    </div>
+  </div>
+
+  <!-- memory sidebar inside chat panel -->
+  <div class="memory-section">
+    <div class="sidebar-header">
+      <span>MEMORY</span>
+    </div>
+    <div class="memory-list" id="memory-list">
+      <div class="memory-empty" id="memory-empty">Nothing remembered yet.<br>Tell Jarvis to<br>"remember that..."</div>
+    </div>
+    <div class="sidebar-hint">say "remember that..."<br>or "forget that..."</div>
+  </div>
+</div>
+
+<!-- AMENDED: status dot kept but hidden, used by script.js internally -->
+<div style="display:none">
+  <div id="status-dot" class="status-dot offline"></div>
+  <span id="status-text">offline</span>
+</div>
+
+<!-- index.html -->
+<script type="module" src="main.js"></script>
+</body>
+</html>
