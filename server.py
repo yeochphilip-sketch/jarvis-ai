@@ -1,147 +1,155 @@
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-import subprocess
-import os, time, threading, re
+import subprocess, os, time, threading, sqlite3, re
+import urllib.request, urllib.parse, json, ssl
+from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
 CORS(app)
 
-import sqlite3
-from datetime import datetime
-
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
-import base64
-import json
-from email.mime.text import MIMEText
-from datetime import datetime, timezone, timedelta
-
-import whisper as whisper_lib
-import tempfile
-
-import urllib.parse
-import urllib.request
-import json as json_lib
-import ssl
-
+# ─────────────────────────────────────────────
+# DATABASE
+# ─────────────────────────────────────────────
 DB_PATH = os.path.expanduser('~/jarvis_data/memory.db')
-os.makedirs(os.path.expanduser('~/jarvis_data'), exist_ok=True)
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-def get_db():
+def db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    conn = get_db()
-    conn.execute('''
+    conn = db()
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS memories (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            category   TEXT    NOT NULL,
-            fact       TEXT    NOT NULL UNIQUE,
-            confidence REAL    DEFAULT 1.0,
-            created_at TEXT    DEFAULT CURRENT_TIMESTAMP,
-            last_seen  TEXT    DEFAULT CURRENT_TIMESTAMP,
+            category   TEXT,
+            fact       TEXT UNIQUE,
+            confidence REAL DEFAULT 1.0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            last_seen  TEXT DEFAULT CURRENT_TIMESTAMP,
             times_seen INTEGER DEFAULT 1
         )
-    ''')
+    """)
     conn.commit()
     conn.close()
 
 init_db()
 
-# ── App name resolution map ───────────────────────────────────────────────────
-APP_NAMES = {
-  'chrome'             : 'Google Chrome',
-  'google chrome'      : 'Google Chrome',
-  'safari'             : 'Safari',
-  'firefox'            : 'Firefox',
-  'spotify'            : 'Spotify',
-  'vscode'             : 'Visual Studio Code',
-  'vs code'            : 'Visual Studio Code',
-  'code'               : 'Visual Studio Code',
-  'terminal'           : 'Terminal',
-  'finder'             : 'Finder',
-  'notes'              : 'Notes',
-  'calendar'           : 'Calendar',
-  'mail'               : 'Mail',
-  'messages'           : 'Messages',
-  'facetime'           : 'FaceTime',
-  'maps'               : 'Maps',
-  'photos'             : 'Photos',
-  'music'              : 'Music',
-  'podcasts'           : 'Podcasts',
-  'slack'              : 'Slack',
-  'discord'            : 'Discord',
-  'zoom'               : 'zoom.us',
-  'figma'              : 'Figma',
-  'notion'             : 'Notion',
-  'obsidian'           : 'Obsidian',
-  'xcode'              : 'Xcode',
-  'system preferences' : 'System Preferences',
-  'system settings'    : 'System Settings',
-  'activity monitor'   : 'Activity Monitor',
-  'calculator'         : 'Calculator',
-  'preview'            : 'Preview',
-  'quicktime'          : 'QuickTime Player',
-  'vlc'                : 'VLC',
-  'word'               : 'Microsoft Word',
-  'excel'              : 'Microsoft Excel',
-  'powerpoint'         : 'Microsoft PowerPoint',
-  'outlook'            : 'Microsoft Outlook',
-  'teams'              : 'Microsoft Teams',
-  'whatsapp'           : 'WhatsApp',
-  'telegram'           : 'Telegram',
-}
-
-WEBSITE_SHORTCUTS = {
-  'youtube'       : 'https://youtube.com',
-  'gmail'         : 'https://mail.google.com',
-  'google'        : 'https://google.com',
-  'github'        : 'https://github.com',
-  'twitter'       : 'https://twitter.com',
-  'x'             : 'https://x.com',
-  'reddit'        : 'https://reddit.com',
-  'netflix'       : 'https://netflix.com',
-  'linkedin'      : 'https://linkedin.com',
-  'chatgpt'       : 'https://chat.openai.com',
-  'claude'        : 'https://claude.ai',
-  'stackoverflow' : 'https://stackoverflow.com',
-  "sls"           : "https://vle.learning.moe.edu.sg/login"
-}
-
-SCOPES           = [
-    'https://www.googleapis.com/auth/gmail.modify',
-    'https://www.googleapis.com/auth/calendar'
-]
+# ─────────────────────────────────────────────
+# GOOGLE AUTH HELPER
+# ─────────────────────────────────────────────
+SCOPES           = ['https://www.googleapis.com/auth/gmail.modify',
+                    'https://www.googleapis.com/auth/calendar']
 CREDENTIALS_FILE = os.path.join(os.path.dirname(__file__), 'credentials.json')
 TOKEN_FILE       = os.path.join(os.path.dirname(__file__), 'token.json')
 
 def get_google_creds():
-    creds = None
-    if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            with open(TOKEN_FILE, 'w') as f:
-                f.write(creds.to_json())
-    return creds
+    try:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
+        creds = None
+        if os.path.exists(TOKEN_FILE):
+            creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                with open(TOKEN_FILE, 'w') as f:
+                    f.write(creds.to_json())
+        return creds
+    except Exception as e:
+        return None
 
+def google_build(service, version):
+    try:
+        from googleapiclient.discovery import build
+        creds = get_google_creds()
+        if not creds:
+            return None
+        return build(service, version, credentials=creds)
+    except Exception:
+        return None
+
+# ─────────────────────────────────────────────
+# WHISPER (lazy load)
+# ─────────────────────────────────────────────
 _whisper_model = None
+
 def get_whisper():
     global _whisper_model
     if _whisper_model is None:
-        _whisper_model = whisper_lib.load_model('base')
+        try:
+            import whisper
+            _whisper_model = whisper.load_model('base')
+        except ImportError:
+            pass
     return _whisper_model
 
-# ── Open app or website ───────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# APP + WEBSITE MAP
+# ─────────────────────────────────────────────
+APP_NAMES = {
+    'chrome'             : 'Google Chrome',
+    'google chrome'      : 'Google Chrome',
+    'safari'             : 'Safari',
+    'firefox'            : 'Firefox',
+    'spotify'            : 'Spotify',
+    'vscode'             : 'Visual Studio Code',
+    'vs code'            : 'Visual Studio Code',
+    'code'               : 'Visual Studio Code',
+    'terminal'           : 'Terminal',
+    'finder'             : 'Finder',
+    'notes'              : 'Notes',
+    'calendar'           : 'Calendar',
+    'mail'               : 'Mail',
+    'messages'           : 'Messages',
+    'facetime'           : 'FaceTime',
+    'maps'               : 'Maps',
+    'photos'             : 'Photos',
+    'music'              : 'Music',
+    'slack'              : 'Slack',
+    'discord'            : 'Discord',
+    'zoom'               : 'zoom.us',
+    'figma'              : 'Figma',
+    'notion'             : 'Notion',
+    'obsidian'           : 'Obsidian',
+    'xcode'              : 'Xcode',
+    'system settings'    : 'System Settings',
+    'activity monitor'   : 'Activity Monitor',
+    'calculator'         : 'Calculator',
+    'preview'            : 'Preview',
+    'quicktime'          : 'QuickTime Player',
+    'vlc'                : 'VLC',
+    'word'               : 'Microsoft Word',
+    'excel'              : 'Microsoft Excel',
+    'powerpoint'         : 'Microsoft PowerPoint',
+    'outlook'            : 'Microsoft Outlook',
+    'teams'              : 'Microsoft Teams',
+    'whatsapp'           : 'WhatsApp',
+    'telegram'           : 'Telegram',
+}
+
+WEBSITE_SHORTCUTS = {
+    'youtube'       : 'https://youtube.com',
+    'gmail'         : 'https://mail.google.com',
+    'google'        : 'https://google.com',
+    'github'        : 'https://github.com',
+    'twitter'       : 'https://twitter.com',
+    'x'             : 'https://x.com',
+    'reddit'        : 'https://reddit.com',
+    'netflix'       : 'https://netflix.com',
+    'linkedin'      : 'https://linkedin.com',
+    'chatgpt'       : 'https://chat.openai.com',
+    'claude'        : 'https://claude.ai',
+    'stackoverflow' : 'https://stackoverflow.com',
+}
+
+# ─────────────────────────────────────────────
+# OPEN
+# ─────────────────────────────────────────────
 @app.route('/open', methods=['POST'])
-def handle_open():
-    data   = request.get_json()
-    target = data.get('target', '').strip()
+def open_target():
+    target = request.json.get('target', '').strip()
     if not target:
         return jsonify({'result': 'No target provided'}), 400
 
@@ -161,140 +169,161 @@ def handle_open():
         return jsonify({'result': f'Opened {WEBSITE_SHORTCUTS[t]}'})
 
     resolved = APP_NAMES.get(t, target.title())
-    app_path = f'/Applications/{resolved}.app'
-
-    if not os.path.exists(app_path):
-        app_path = f'/System/Applications/{resolved}.app'
-    if not os.path.exists(app_path):
-        result = subprocess.run(['open', '-a', resolved], capture_output=True)
-        if result.returncode != 0:
-            return jsonify({'result': f'Could not find app: {resolved}'}), 404
-        return jsonify({'result': f'Opened {resolved}'})
-
-    subprocess.Popen(['open', app_path])
+    result   = subprocess.run(['open', '-a', resolved], capture_output=True)
+    if result.returncode != 0:
+        return jsonify({'result': f'Could not find app: {resolved}'}), 404
     return jsonify({'result': f'Opened {resolved}'})
 
 
-# ── Speak ─────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# SPEAK
+# ─────────────────────────────────────────────
 @app.route('/speak', methods=['POST'])
-def handle_speak():
-    data = request.get_json()
-    text = data.get('text', '')
+def speak():
+    text = request.json.get('text', '')
     if not text:
-        return jsonify({'result': 'No text provided'}), 400
+        return jsonify({'error': 'no text'}), 400
 
-    output_path = '/tmp/jarvis_speech.aiff'
-    wav_path    = '/tmp/jarvis_speech.wav'
-
-    subprocess.run(['say', '-v', 'Daniel', '-r', '165', '-o', output_path, text])
-    subprocess.run(['afconvert', '-f', 'WAVE', '-d', 'LEF32@22050', output_path, wav_path])
-
+    aiff_path = '/tmp/jarvis_speech.aiff'
+    wav_path  = '/tmp/jarvis_speech.wav'
+    subprocess.run(['say', '-v', 'Daniel', '-r', '165', '-o', aiff_path, text])
+    subprocess.run(['afconvert', '-f', 'WAVE', '-d', 'LEF32@22050', aiff_path, wav_path])
     return send_file(wav_path, mimetype='audio/wav')
 
 
-# ── Timer ─────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# TIMER
+# ─────────────────────────────────────────────
 @app.route('/timer', methods=['POST'])
-def handle_timer():
-    data = request.get_json()
+def timer():
     try:
-        seconds = int(data.get('target', 0))
+        seconds = int(request.json.get('target', 0))
     except ValueError:
         return jsonify({'result': 'Invalid timer value'}), 400
 
-    def run_timer():
+    def run():
         time.sleep(seconds)
         subprocess.run([
             'osascript', '-e',
             'display notification "Timer done" with title "Jarvis" sound name "Glass"'
         ])
 
-    threading.Thread(target=run_timer, daemon=True).start()
+    threading.Thread(target=run, daemon=True).start()
     return jsonify({'result': f'Timer set for {seconds} seconds'})
 
 
-# ── Search ────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# SEARCH (opens browser)
+# ─────────────────────────────────────────────
 @app.route('/search', methods=['POST'])
-def handle_search():
-    data  = request.get_json()
-    query = data.get('target', '')
-    if not query:
-        return jsonify({'result': 'No search query provided'}), 400
-    search_url = f'https://duckduckgo.com/?q={query.replace(" ", "+")}'
-    subprocess.Popen(['open', search_url])
+def search():
+    query = request.json.get('target', '')
+    url   = f'https://duckduckgo.com/?q={urllib.parse.quote(query)}'
+    subprocess.Popen(['open', url])
     return jsonify({'result': f'Searched for {query}'})
 
 
-# ── Files ─────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# WEB SEARCH (returns text summary)
+# ─────────────────────────────────────────────
+@app.route('/websearch', methods=['POST'])
+def websearch():
+    query = request.json.get('query', '').strip()
+    if not query:
+        return jsonify({'error': 'No query provided'}), 400
+
+    try:
+        encoded = urllib.parse.quote(query)
+        url     = f'https://api.duckduckgo.com/?q={encoded}&format=json&no_redirect=1&no_html=1&skip_disambig=1'
+        ctx     = ssl.create_default_context()
+        req     = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/1.0'})
+        with urllib.request.urlopen(req, context=ctx, timeout=8) as r:
+            ddg = json.loads(r.read().decode())
+
+        snippets = []
+        abstract = ddg.get('AbstractText', '').strip()
+        if abstract:
+            snippets.append(abstract)
+        for topic in ddg.get('RelatedTopics', [])[:6]:
+            if isinstance(topic, dict) and topic.get('Text'):
+                snippets.append(topic['Text'])
+
+        if not snippets:
+            return jsonify({'result': f'No results found for: {query}'})
+
+        return jsonify({'result': ' '.join(snippets[:5])})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+# FILES
+# ─────────────────────────────────────────────
 @app.route('/files', methods=['POST'])
-def handle_files():
-    data    = request.get_json()
-    target  = data.get('target', '')
+def files():
+    target  = request.json.get('target', '')
     parts   = target.split(':', 1)
     command = parts[0].strip().lower() if parts else ''
     path    = os.path.expanduser(parts[1].strip()) if len(parts) > 1 else ''
 
-    allowed = [
-        os.path.expanduser('~/Desktop'),
-        os.path.expanduser('~/Documents'),
-    ]
+    allowed = [os.path.expanduser('~/Desktop'), os.path.expanduser('~/Documents')]
     if not any(os.path.abspath(path).startswith(a) for a in allowed):
-        return jsonify({'result': 'Access denied. Only Desktop and Documents allowed.'}), 403
+        return jsonify({'result': 'Access denied'}), 403
 
     try:
         if command == 'list':
-            files = os.listdir(path)
-            return jsonify({'result': 'Files: ' + ', '.join(files)})
+            return jsonify({'result': 'Files: ' + ', '.join(os.listdir(path))})
         elif command == 'create':
             os.makedirs(path, exist_ok=True)
-            return jsonify({'result': f'Created folder {path}'})
+            return jsonify({'result': f'Created {path}'})
         elif command == 'delete':
             os.remove(path)
             return jsonify({'result': f'Deleted {path}'})
         else:
             return jsonify({'result': f'Unknown command: {command}'}), 400
     except Exception as e:
-        return jsonify({'result': f'Error: {str(e)}'}), 500
+        return jsonify({'result': f'Error: {e}'}), 500
 
 
-# ── Volume ────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# VOLUME
+# ─────────────────────────────────────────────
 @app.route('/volume', methods=['POST'])
-def handle_volume():
-    data = request.get_json()
+def volume():
     try:
-        level = int(data.get('target', 0))
+        level = int(request.json.get('target', 0))
         if not 0 <= level <= 100:
             raise ValueError
     except (ValueError, TypeError):
         return jsonify({'result': 'Volume must be 0 to 100'}), 400
-
     subprocess.run(['osascript', '-e', f'set volume output volume {level}'])
     return jsonify({'result': f'Volume set to {level}%'})
 
 
-# ── Brightness ────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# BRIGHTNESS
+# ─────────────────────────────────────────────
 @app.route('/brightness', methods=['POST'])
-def handle_brightness():
-    data = request.get_json()
+def brightness():
     try:
-        level = int(data.get('target', 0))
+        level = int(request.json.get('target', 0))
         if not 0 <= level <= 100:
             raise ValueError
     except (ValueError, TypeError):
         return jsonify({'result': 'Brightness must be 0 to 100'}), 400
-
-    brightness = round(level / 100, 2)
-    subprocess.run([
-        'osascript', '-e',
-        f'tell application "System Events" to set brightness of screen 1 to {brightness}'
-    ])
+    b = round(level / 100, 2)
+    subprocess.run(['osascript', '-e',
+        f'tell application "System Events" to set brightness of screen 1 to {b}'])
     return jsonify({'result': f'Brightness set to {level}%'})
 
 
-# ── System info ───────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# SYSTEM INFO
+# ─────────────────────────────────────────────
 @app.route('/sysinfo', methods=['POST'])
-def handle_sysinfo():
-    data    = request.get_json()
-    query   = data.get('target', '').lower()
+def sysinfo():
+    query   = request.json.get('target', '').lower()
     results = []
 
     if any(w in query for w in ['battery', 'power', 'charge']):
@@ -305,17 +334,13 @@ def handle_sysinfo():
                 pct      = match.group(1)
                 charging = 'charging' if 'AC Power' in out else 'on battery'
                 results.append(f'Battery at {pct}%, {charging}')
-            else:
-                results.append('Could not read battery level')
         except Exception as e:
             results.append(f'Battery error: {e}')
 
     if any(w in query for w in ['storage', 'disk', 'space']):
         try:
-            out   = subprocess.check_output(['df', '-h', '/'], text=True)
-            parts = out.split('\n')[1].split()
-            total, used, avail = parts[1], parts[2], parts[3]
-            results.append(f'Disk: {used} used of {total}, {avail} available')
+            parts = subprocess.check_output(['df', '-h', '/'], text=True).split('\n')[1].split()
+            results.append(f'Disk: {parts[2]} used of {parts[1]}, {parts[3]} available')
         except Exception as e:
             results.append(f'Storage error: {e}')
 
@@ -326,9 +351,7 @@ def handle_sysinfo():
             active     = int(re.search(r'Pages active:\s+(\d+)', out).group(1))
             compressed = int(re.search(r'Pages occupied by compressor:\s+(\d+)', out).group(1))
             page       = 4096
-            free_mb    = (free * page) // (1024 * 1024)
-            used_mb    = ((active + compressed) * page) // (1024 * 1024)
-            results.append(f'RAM: {used_mb}MB used, {free_mb}MB free')
+            results.append(f'RAM: {((active+compressed)*page)//(1024*1024)}MB used, {(free*page)//(1024*1024)}MB free')
         except Exception as e:
             results.append(f'Memory error: {e}')
 
@@ -337,11 +360,8 @@ def handle_sysinfo():
             out   = subprocess.check_output(['top', '-l', '1', '-n', '0'], text=True)
             match = re.search(r'CPU usage:\s+([\d.]+)%\s+user,\s+([\d.]+)%\s+sys,\s+([\d.]+)%\s+idle', out)
             if match:
-                user, sys, idle = match.group(1), match.group(2), match.group(3)
-                used = round(float(user) + float(sys), 1)
-                results.append(f'CPU: {used}% used, {idle}% idle')
-            else:
-                results.append('Could not read CPU usage')
+                used = round(float(match.group(1)) + float(match.group(2)), 1)
+                results.append(f'CPU: {used}% used, {match.group(3)}% idle')
         except Exception as e:
             results.append(f'CPU error: {e}')
 
@@ -356,10 +376,7 @@ def handle_sysinfo():
         try:
             out   = subprocess.check_output(['uptime'], text=True).strip()
             match = re.search(r'up\s+(.+?),\s+\d+\s+user', out)
-            if match:
-                results.append(f'System up for {match.group(1).strip()}')
-            else:
-                results.append(f'Uptime: {out}')
+            results.append(f'System up for {match.group(1).strip()}' if match else f'Uptime: {out}')
         except Exception as e:
             results.append(f'Uptime error: {e}')
 
@@ -369,128 +386,153 @@ def handle_sysinfo():
             for line in out.split('\n'):
                 if line.startswith('en0') and '<Link#' in line:
                     parts  = line.split()
-                    ibytes = int(parts[6])
-                    obytes = int(parts[9])
                     def fmt(b):
+                        b = int(b)
                         if b > 1_073_741_824: return f'{b/1_073_741_824:.1f}GB'
                         if b > 1_048_576:     return f'{b/1_048_576:.1f}MB'
                         return f'{b/1024:.1f}KB'
-                    results.append(f'Network: {fmt(ibytes)} received, {fmt(obytes)} sent')
+                    results.append(f'Network: {fmt(parts[6])} received, {fmt(parts[9])} sent')
                     break
         except Exception as e:
             results.append(f'Network error: {e}')
 
     if not results:
-        results.append('Available system info: battery, storage, memory, cpu, temperature, uptime, network')
+        results.append('Available: battery, storage, memory, cpu, temperature, uptime, network')
 
     return jsonify({'result': '. '.join(results)})
 
 
-# ── Date and time ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# DATETIME
+# ─────────────────────────────────────────────
 @app.route('/datetime', methods=['POST'])
-def handle_datetime():
-    from datetime import datetime
-    now       = datetime.now()
-    formatted = now.strftime('%A, %B %d %Y at %I:%M %p')
-    return jsonify({'result': f'It is {formatted}'})
+def dt():
+    return jsonify({'result': datetime.now().strftime('%A, %B %d %Y at %I:%M %p')})
 
 
-# ── Gmail unread count ────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# MEMORY
+# ─────────────────────────────────────────────
+@app.route('/memory/save', methods=['POST'])
+def save_memory():
+    facts = request.json.get('facts', [])
+    conn  = db()
+    saved = 0
+    for f in facts:
+        fact = f.get('fact', '').strip()
+        if not fact:
+            continue
+        existing = conn.execute('SELECT id FROM memories WHERE fact = ?', (fact,)).fetchone()
+        if existing:
+            conn.execute('''UPDATE memories SET last_seen = ?, times_seen = times_seen + 1
+                           WHERE fact = ?''', (datetime.now().isoformat(), fact))
+        else:
+            conn.execute('INSERT INTO memories (category, fact) VALUES (?, ?)',
+                        (f.get('category', 'general'), fact))
+            saved += 1
+    conn.commit()
+    conn.close()
+    return jsonify({'result': f'Saved {saved} facts'})
+
+
+@app.route('/memory/load', methods=['GET'])
+def load_memory():
+    conn = db()
+    rows = conn.execute(
+        'SELECT category, fact FROM memories ORDER BY times_seen DESC, last_seen DESC LIMIT 15'
+    ).fetchall()
+    conn.close()
+    return jsonify({'facts': [dict(r) for r in rows]})
+
+
+# ─────────────────────────────────────────────
+# GMAIL
+# ─────────────────────────────────────────────
 @app.route('/gmail/count', methods=['POST'])
-def handle_gmail_count():
+def gmail_count():
+    svc = google_build('gmail', 'v1')
+    if not svc:
+        return jsonify({'result': 'Gmail not available'})
     try:
-        creds   = get_google_creds()
-        service = build('gmail', 'v1', credentials=creds)
-        results = service.users().messages().list(
+        results = svc.users().messages().list(
             userId='me', labelIds=['INBOX', 'UNREAD'], maxResults=1
         ).execute()
         count = results.get('resultSizeEstimate', 0)
         return jsonify({'result': f'{count} unread email{"s" if count != 1 else ""}'})
     except Exception as e:
-        return jsonify({'result': f'Could not check email count: {str(e)}'}), 500
+        return jsonify({'result': f'Gmail error: {e}'})
 
 
-# ── Gmail triage ──────────────────────────────────────────────────────────────
 @app.route('/gmail/triage', methods=['POST'])
-def handle_gmail_triage():
+def gmail_triage():
+    svc = google_build('gmail', 'v1')
+    if not svc:
+        return jsonify({'result': 'Gmail not available'})
     try:
-        creds   = get_google_creds()
-        service = build('gmail', 'v1', credentials=creds)
-
-        results  = service.users().messages().list(
+        results  = svc.users().messages().list(
             userId='me', labelIds=['INBOX', 'UNREAD'], maxResults=10
         ).execute()
         messages = results.get('messages', [])
-
         if not messages:
             return jsonify({'result': 'No unread emails. Your inbox is clear.'})
 
-        summaries = []
+        emails = []
         for msg in messages:
-            full = service.users().messages().get(
+            full    = svc.users().messages().get(
                 userId='me', id=msg['id'], format='metadata',
                 metadataHeaders=['From', 'Subject']
             ).execute()
-
             headers = {h['name']: h['value'] for h in full['payload']['headers']}
-            sender  = headers.get('From', 'Unknown')
-            subject = headers.get('Subject', 'No subject')
-            snippet = full.get('snippet', '')
-
-            summaries.append({
+            emails.append({
                 'id'     : msg['id'],
-                'from'   : sender,
-                'subject': subject,
-                'snippet': snippet,
+                'from'   : headers.get('From', 'Unknown'),
+                'subject': headers.get('Subject', 'No subject'),
+                'snippet': full.get('snippet', ''),
             })
-
-        return jsonify({'emails': summaries, 'count': len(summaries)})
-
+        return jsonify({'emails': emails, 'count': len(emails)})
     except Exception as e:
-        return jsonify({'result': f'Gmail error: {str(e)}'}), 500
+        return jsonify({'result': f'Gmail error: {e}'})
 
 
-# ── Gmail delete ──────────────────────────────────────────────────────────────
 @app.route('/gmail/delete', methods=['POST'])
-def handle_gmail_delete():
+def gmail_delete():
+    svc    = google_build('gmail', 'v1')
+    msg_id = request.json.get('id', '')
+    if not svc:
+        return jsonify({'result': 'Gmail not available'})
     try:
-        data    = request.get_json()
-        msg_id  = data.get('id', '')
-        creds   = get_google_creds()
-        service = build('gmail', 'v1', credentials=creds)
-        service.users().messages().trash(userId='me', id=msg_id).execute()
-        return jsonify({'result': 'Email deleted.'})
+        svc.users().messages().trash(userId='me', id=msg_id).execute()
+        return jsonify({'result': 'Email deleted'})
     except Exception as e:
-        return jsonify({'result': f'Delete error: {str(e)}'}), 500
+        return jsonify({'result': f'Delete error: {e}'})
 
 
-# ── Calendar upcoming ─────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# CALENDAR
+# ─────────────────────────────────────────────
 @app.route('/calendar/upcoming', methods=['POST'])
-def handle_calendar_upcoming():
+def calendar_upcoming():
+    svc  = google_build('calendar', 'v3')
+    if not svc:
+        return jsonify({'result': 'Calendar not available'})
     try:
-        data    = request.get_json()
-        days    = int(data.get('target', 1))
-        creds   = get_google_creds()
-        service = build('calendar', 'v3', credentials=creds)
-
-        now = datetime.now(timezone.utc)
-        end = now + timedelta(days=days)
-
-        events_result = service.events().list(
+        days = int(request.json.get('target', 1))
+        now  = datetime.now(timezone.utc)
+        end  = now + timedelta(days=days)
+        evts = svc.events().list(
             calendarId='primary',
             timeMin=now.isoformat(),
             timeMax=end.isoformat(),
             maxResults=10,
             singleEvents=True,
             orderBy='startTime'
-        ).execute()
+        ).execute().get('items', [])
 
-        events = events_result.get('items', [])
-        if not events:
+        if not evts:
             return jsonify({'result': f'No events in the next {days} day(s).'})
 
         lines = []
-        for e in events:
+        for e in evts:
             start   = e['start'].get('dateTime', e['start'].get('date', ''))
             summary = e.get('summary', 'Untitled event')
             if 'T' in start:
@@ -498,25 +540,22 @@ def handle_calendar_upcoming():
                 lines.append(f'{dt.strftime("%A %d %B at %I:%M %p")}: {summary}')
             else:
                 lines.append(f'{start}: {summary}')
-
         return jsonify({'result': '. '.join(lines)})
-
     except Exception as e:
-        return jsonify({'result': f'Calendar error: {str(e)}'}), 500
+        return jsonify({'result': f'Calendar error: {e}'})
 
 
-# ── Calendar create ───────────────────────────────────────────────────────────
 @app.route('/calendar/create', methods=['POST'])
-def handle_calendar_create():
+def calendar_create():
+    svc = google_build('calendar', 'v3')
+    if not svc:
+        return jsonify({'result': 'Calendar not available'})
     try:
-        data    = request.get_json()
+        data    = request.json
         summary = data.get('summary', 'New Event')
         start   = data.get('start', '')
         end     = data.get('end', '')
-        creds   = get_google_creds()
-        service = build('calendar', 'v3', credentials=creds)
-
-        event = {
+        event   = {
             'summary': summary,
             'start'  : {'dateTime': start, 'timeZone': 'Asia/Singapore'},
             'end'    : {'dateTime': end,   'timeZone': 'Asia/Singapore'},
@@ -528,148 +567,37 @@ def handle_calendar_create():
                 ],
             },
         }
-
-        service.events().insert(calendarId='primary', body=event).execute()
-        return jsonify({'result': f'Event created: {summary} on {start}'})
-
+        svc.events().insert(calendarId='primary', body=event).execute()
+        return jsonify({'result': f'Event created: {summary}'})
     except Exception as e:
-        return jsonify({'result': f'Calendar create error: {str(e)}'}), 500
+        return jsonify({'result': f'Calendar create error: {e}'})
 
 
-# ── Memory save ───────────────────────────────────────────────────────────────
-@app.route('/memory/save', methods=['POST'])
-def handle_memory_save():
-    data  = request.get_json()
-    facts = data.get('facts', [])
-    if not facts:
-        return jsonify({'result': 'No facts provided'}), 400
-
-    conn    = get_db()
-    saved   = 0
-    skipped = 0
-
-    for item in facts:
-        category = item.get('category', 'general').strip()
-        fact     = item.get('fact', '').strip()
-        if not fact:
-            continue
-        try:
-            existing = conn.execute(
-                'SELECT id, times_seen FROM memories WHERE fact = ?', (fact,)
-            ).fetchone()
-
-            if existing:
-                conn.execute('''
-                    UPDATE memories
-                    SET last_seen  = ?,
-                        times_seen = times_seen + 1,
-                        confidence = MIN(confidence + 0.1, 1.0)
-                    WHERE fact = ?
-                ''', (datetime.now().isoformat(), fact))
-                skipped += 1
-            else:
-                conn.execute('''
-                    INSERT INTO memories (category, fact, created_at, last_seen)
-                    VALUES (?, ?, ?, ?)
-                ''', (category, fact, datetime.now().isoformat(), datetime.now().isoformat()))
-                saved += 1
-        except Exception as e:
-            print(f'[memory] Error saving fact: {e}')
-
-    conn.commit()
-    conn.close()
-    return jsonify({'result': f'Saved {saved} new facts, updated {skipped} existing'})
-
-
-# ── Memory load ───────────────────────────────────────────────────────────────
-@app.route('/memory/load', methods=['GET'])
-def handle_memory_load():
-    try:
-        conn = get_db()
-        rows = conn.execute('''
-            SELECT category, fact
-            FROM   memories
-            ORDER  BY times_seen DESC, last_seen DESC
-            LIMIT  15
-        ''').fetchall()
-        conn.close()
-        facts = [{'category': r['category'], 'fact': r['fact']} for r in rows]
-        return jsonify({'facts': facts})
-    except Exception as e:
-        return jsonify({'facts': [], 'error': str(e)})
-
+# ─────────────────────────────────────────────
+# TRANSCRIBE (Whisper)
+# ─────────────────────────────────────────────
 @app.route('/transcribe', methods=['POST'])
-def handle_transcribe():
+def transcribe():
+    model = get_whisper()
+    if not model:
+        return jsonify({'error': 'Whisper not installed. Run: pip3 install openai-whisper'}), 200
+
     if 'audio' not in request.files:
-        return jsonify({'error': 'No audio file'}), 400
+        return jsonify({'error': 'No audio file provided'}), 400
+
     audio_file = request.files['audio']
-    with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as tmp:
-        audio_file.save(tmp.name)
-        webm_path = tmp.name
+    tmp_path   = '/tmp/jarvis_input.webm'
+    wav_path   = '/tmp/jarvis_input.wav'
+    audio_file.save(tmp_path)
 
-    # Save a copy for debugging
-    import shutil
-    shutil.copy(webm_path, '/tmp/last_recording.webm')
+    subprocess.run(['ffmpeg', '-y', '-i', tmp_path, wav_path],
+                   capture_output=True)
 
-    wav_path = webm_path.replace('.webm', '.wav')
-    try:
-        subprocess.run(
-            ['ffmpeg', '-y', '-i', webm_path, wav_path],
-            capture_output=True, check=True
-        )
-        result = get_whisper().transcribe(wav_path, language='en')
-        text   = result['text'].strip()
-        return jsonify({'transcript': text})
-    except subprocess.CalledProcessError as e:
-        return jsonify({'error': f'ffmpeg failed: {e.stderr.decode()}'}), 500
-    except Exception as e:
-        import traceback
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
-    finally:
-        os.unlink(webm_path)
-        if os.path.exists(wav_path):
-            os.unlink(wav_path)
+    result = model.transcribe(wav_path)
+    return jsonify({'text': result.get('text', '').strip()})
 
-@app.route('/websearch', methods=['POST'])
-def handle_websearch():
-    data  = request.get_json()
-    query = data.get('query', '').strip()
-    if not query:
-        return jsonify({'error': 'No query provided'}), 400
 
-    try:
-        # DuckDuckGo instant answer API
-        encoded = urllib.parse.quote(query)
-        url     = f'https://api.duckduckgo.com/?q={encoded}&format=json&no_redirect=1&no_html=1&skip_disambig=1'
-        ctx     = ssl.create_default_context()
-        req     = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/1.0'})
-        with urllib.request.urlopen(req, context=ctx, timeout=8) as r:
-            raw  = r.read().decode()
-            ddg  = json_lib.loads(raw)
-
-        # Collect results
-        snippets = []
-
-        abstract = ddg.get('AbstractText', '').strip()
-        if abstract:
-            snippets.append(abstract)
-
-        for topic in ddg.get('RelatedTopics', [])[:6]:
-            if isinstance(topic, dict) and topic.get('Text'):
-                snippets.append(topic['Text'])
-
-        if not snippets:
-            return jsonify({'result': f'No results found for: {query}'}), 200
-
-        combined = ' '.join(snippets[:5])
-        return jsonify({'result': combined, 'snippets': snippets})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
+# ─────────────────────────────────────────────
 if __name__ == '__main__':
-    print('Jarvis Flask server running on https://localhost:5001')
-    app.run(port=5001, debug=True, ssl_context=(
-        '/Users/philipyeo/jarvis/127.0.0.1+1.pem',
-        '/Users/philipyeo/jarvis/127.0.0.1+1-key.pem'
-    ))
+    print('Jarvis server running on http://localhost:5001')
+    app.run(port=5001, debug=False)
