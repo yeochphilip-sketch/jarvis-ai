@@ -51,7 +51,7 @@ function setInputLocked(locked) {
 async function deliverMorningBriefing() {
   setOrbState('thinking');
   try {
-    const [timeRes, calRes, countRes] = await Promise.all([
+        const [timeRes, calRes, countRes, weatherRes] = await Promise.all([
       fetch(`${CONFIG.flaskUrl}/datetime`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
       }),
@@ -62,19 +62,20 @@ async function deliverMorningBriefing() {
       fetch(`${CONFIG.flaskUrl}/gmail/count`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
       }),
-      fetch(`${CONFIG.flaskUrl}/websearch`, {
+      fetch(`${CONFIG.flaskUrl}/weather`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: 'top news today' })
+        body: JSON.stringify({ target: 'Singapore' })
       }),
     ]);
 
-    const timeData  = await timeRes.json();
-    const calData   = await calRes.json();
-    const countData = await countRes.json();
-
-    const timeStr  = timeData.result  ?? 'unknown time';
-    const calStr   = calData.result   ?? 'No events today';
-    const countStr = countData.result ?? 'Unknown email count';
+    const timeData    = await timeRes.json();
+    const calData     = await calRes.json();
+    const countData   = await countRes.json();
+    const weatherData = await weatherRes.json();
+    const timeStr    = timeData.result    ?? 'unknown time';
+    const calStr     = calData.result     ?? 'No events today';
+    const countStr   = countData.result   ?? 'Unknown email count';
+    const weatherStr = weatherData.result ?? 'Weather unavailable';
 
     // Isolated messages array — never touches STATE.history
     // so Llama cannot hallucinate from previous conversation
@@ -91,7 +92,7 @@ async function deliverMorningBriefing() {
           },
           {
             role   : 'user',
-            content: `Time: ${timeStr}\nCalendar: ${calStr}\nEmail: ${countStr}`
+            content: `Time: ${timeStr}\nCalendar: ${calStr}\nEmail: ${countStr}\nWeather: ${weatherStr}`
           }
         ]
       })
