@@ -94,7 +94,7 @@ function startSilenceDetection() {
     analyser.getByteFrequencyData(data);
     const avg = data.reduce((a, b) => a + b, 0) / data.length;
 
-    if (avg < 25) {
+    if (avg < 40) {
       // Silence — schedule a stop if not already pending
       if (!silenceTimer) {
         silenceTimer = setTimeout(() => {
@@ -113,6 +113,19 @@ function startSilenceDetection() {
   check();
 }
 
+function isValidTranscript(text) {
+  // Reject if more than 30% non-ASCII characters (catches CJK hallucinations)
+  const nonAscii = (text.match(/[^\x00-\x7F]/g) || []).length;
+  if (nonAscii / text.length > 0.3) return false;
+  // Reject repetitive tokens like "1.5% 1.5% 1.5%"
+  const words = text.trim().split(/\s+/);
+  if (words.length >= 3) {
+    const unique = new Set(words);
+    if (unique.size / words.length < 0.4) return false;
+  }
+  return true;
+}
+
 // ── Transcription ─────────────────────────────────────────────────────────────
 
 async function transcribeAndSend(blob) {
@@ -128,7 +141,7 @@ async function transcribeAndSend(blob) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const { transcript } = await res.json();
 
-    if (transcript && transcript.length > 1) {
+    if (transcript && transcript.length > 1 && isValidTranscript(transcript)) {
       DOM.input.value = transcript;
       sendMessageFn();
       return; // don't restart — sendMessage triggers startListening when done

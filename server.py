@@ -5,7 +5,7 @@ import urllib.request, urllib.parse, json, ssl
 from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "https://localhost:5500"}}, supports_credentials=True)
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -584,21 +584,32 @@ def calendar_create():
 def transcribe():
     model = get_whisper()
     if not model:
-        return jsonify({'error': 'Whisper not installed. Run: pip3 install openai-whisper'}), 200
+        return jsonify({'transcript': ''}), 200
 
     if 'audio' not in request.files:
-        return jsonify({'error': 'No audio file provided'}), 400
+        return jsonify({'transcript': ''}), 200
 
     audio_file = request.files['audio']
     tmp_path   = '/tmp/jarvis_input.webm'
     wav_path   = '/tmp/jarvis_input.wav'
-    audio_file.save(tmp_path)
+    
+    try:
+        audio_file.save(tmp_path)
+        if os.path.getsize(tmp_path) < 1000:
+            return jsonify({'transcript': ''}), 200
 
-    subprocess.run(['ffmpeg', '-y', '-i', tmp_path, wav_path],
-                   capture_output=True)
+        result = subprocess.run(
+            ['ffmpeg', '-y', '-i', tmp_path, wav_path],
+            capture_output=True
+        )
+        if result.returncode != 0:
+            return jsonify({'transcript': ''}), 200
 
-    result = model.transcribe(wav_path)
-    return jsonify({'transcript': result.get('text', '').strip()})
+        transcription = model.transcribe(wav_path)
+        return jsonify({'transcript': transcription.get('text', '').strip()})
+    except Exception as e:
+        print(f'[transcribe] error: {e}')
+        return jsonify({'transcript': ''}), 200
 
 @app.route('/news', methods=['POST'])
 def news():

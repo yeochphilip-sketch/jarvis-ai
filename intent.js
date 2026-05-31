@@ -85,6 +85,10 @@ export function detectIntent(text) {
   const calTodayMatch = t.match(/(?:what(?:'s|is)\s+(?:on\s+)?(?:my\s+)?(?:calendar|schedule)\s+today|what\s+do\s+i\s+have\s+today)/);
   if (calTodayMatch) return { action: 'calendar_upcoming', target: '1' };
 
+  //create calendar event
+  const calCreateMatch = t.match(/(?:add|create|schedule|set up)\s+(?:an?\s+)?(?:event|meeting|appointment|reminder)(.+)/);
+  if (calCreateMatch) return { action: 'calendar_create_nl', target: t };
+
   // Calendar this week
   const calWeekMatch = t.match(/(?:what(?:'s|is)\s+(?:on\s+)?(?:my\s+)?(?:calendar|schedule)\s+this\s+week|what\s+do\s+i\s+have\s+this\s+week)/);
   if (calWeekMatch) return { action: 'calendar_upcoming', target: '7' };
@@ -223,10 +227,16 @@ export async function executeIntent(intent) {
     return;
   }
 
+  if (intent.action === 'calendar_create_nl') {
+  await handleCalendarCreate(intent.target);
+  return;
+  }
+
   const serverResult = await callServer(
     intent.action.replace('_', '/'),
     { target: intent.target }
   );
+
 
   const confirmations = {
     open              : `Opened ${intent.target}.`,
@@ -330,6 +340,43 @@ async function handleWebSearch(query) {
     UI.addMessage('assistant', msg);
     speak(msg);
   }
+}
+
+async function handleCalendarCreate(query) {
+  const now = new Date().toISOString();
+  const parseRes = await fetch(CONFIG.ollamaUrl, {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({
+      model  : CONFIG.model,
+      stream : false,
+      messages: [
+        {
+          role   : 'system',
+          content: `You are a calendar parser. Current datetime: ${now}. Timezone: Asia/Singapore.
+Extract the event details and respond ONLY with valid JSON, no markdown:
+{"summary":"event title","start":"2026-05-31T14:00:00+08:00","end":"2026-05-31T15:00:00+08:00"}
+If no duration is specified, assume 1 hour. If no time is specified, assume 09:00.`
+        },
+        { role: 'user', content: query }
+      ]
+    })
+  });
+  const parseData = await parseRes.json();
+  const content   = parseData.message?.content?.trim() ?? '';
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    const msg = 'I could not understand the event details. Please try again with a specific time.';
+    UI.addMessage('assistant', msg);
+    speak(msg);
+    return;
+  }
+  const event = JSON.parse(jsonMatch[0]);
+  const result = await callServer('calendar/create', event);
+  const msg = result ?? 'Could not create the event.';
+  UI.addMessage('assistant', msg);
+  speak(msg);
+  STATE.history.push({ role: 'assistant', content: msg });
 }
 
 // ── Gmail triage ──────────────────────────────────────────────────────────────

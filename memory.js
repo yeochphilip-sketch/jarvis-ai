@@ -121,8 +121,9 @@ Example output:
 
     const data    = await response.json();
     const content = data.message?.content?.trim() ?? '';
-    const cleaned = content.replace(/```json|```/g, '').trim();
-    const parsed  = JSON.parse(cleaned);
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return;
+    const parsed = JSON.parse(jsonMatch[0]);
 
     if (!parsed.facts || parsed.facts.length === 0) return;
 
