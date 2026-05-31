@@ -253,10 +253,47 @@ export async function executeIntent(intent) {
 
 // ── Web search ────────────────────────────────────────────────────────────────
 async function handleWebSearch(query) {
+  const isNews = /news|headlines|briefing/.test(query.toLowerCase());
+
+  if (isNews) {
+    try {
+      const res = await fetch(`${CONFIG.flaskUrl}/news`, {
+        method : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body   : '{}'
+      });
+      const data = await res.json();
+      if (data.result) {
+        const summaryRes = await fetch(CONFIG.ollamaUrl, {
+          method : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body   : JSON.stringify({
+            model  : CONFIG.model,
+            stream : false,
+            messages: [
+              {
+                role   : 'system',
+                content: 'Summarise the following news headlines in 3 sentences. Use only what is given. No bullet points. No filler.'
+              },
+              { role: 'user', content: data.result }
+            ]
+          })
+        });
+        const summaryData = await summaryRes.json();
+        const summary = summaryData.message?.content?.trim() ?? data.result;
+        UI.addMessage('assistant', summary);
+        speak(summary);
+        STATE.history.push({ role: 'assistant', content: summary });
+        return;
+      }
+    } catch (err) {
+      console.warn('[news] fetch failed:', err);
+    }
+  }
+
   const thinkingMsg = `Searching for ${query}.`;
   UI.addMessage('assistant', thinkingMsg);
   speak(thinkingMsg);
-
   try {
     const res = await fetch(`${CONFIG.flaskUrl}/websearch`, {
       method : 'POST',
@@ -264,7 +301,6 @@ async function handleWebSearch(query) {
       body   : JSON.stringify({ query })
     });
     const data = await res.json();
-
     if (data.error) throw new Error(data.error);
     if (!data.result) throw new Error('No results returned');
 
@@ -277,19 +313,14 @@ async function handleWebSearch(query) {
         messages: [
           {
             role   : 'system',
-            content: 'You are Jarvis. Summarise the following search results into 2 to 3 concise sentences. Only include what is genuinely relevant. No bullet points. No filler. No markdown.'
+            content: 'Summarise the following search results into 2 to 3 concise sentences. Only include what is genuinely relevant. No bullet points. No filler. No markdown.'
           },
-          {
-            role   : 'user',
-            content: data.result
-          }
+          { role: 'user', content: data.result }
         ]
       })
     });
-
     const summaryData = await summaryRes.json();
     const summary     = summaryData.message?.content?.trim() ?? data.result;
-
     UI.addMessage('assistant', summary);
     speak(summary);
     STATE.history.push({ role: 'assistant', content: summary });
@@ -300,7 +331,6 @@ async function handleWebSearch(query) {
     speak(msg);
   }
 }
-
 
 // ── Gmail triage ──────────────────────────────────────────────────────────────
 async function handleGmailTriage() {

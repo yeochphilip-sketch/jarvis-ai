@@ -11,7 +11,7 @@ export const CONFIG = {
   // ── Server endpoints ────────────────────────────────────────────────────────
   ollamaUrl : 'http://localhost:11434/api/chat',
   flaskUrl  : 'https://localhost:5001',
-  model     : 'llama3.2:1b',
+  model     : 'llama3.2',
 
   // ── Voice (SpeechSynthesis fallback) ────────────────────────────────────────
   // Used when the Flask /speak endpoint is unavailable.

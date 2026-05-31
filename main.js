@@ -147,7 +147,7 @@ async function sendMessage() {
     'brief me', 'morning briefing', 'give me a briefing',
     'good morning', 'good morning jarvis', "what's my morning briefing",
     'what is my morning briefing', 'start my day', 'daily briefing',
-    'latest news', 'what is the news', "what's the news", 'news today', 'news briefing',
+    'news briefing',
   ];
   if (briefingPhrases.includes(tLower)) {
     stopSpeaking();

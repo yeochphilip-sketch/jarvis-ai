@@ -7,6 +7,10 @@ from datetime import datetime, timezone, timedelta
 app = Flask(__name__)
 CORS(app)
 
+from dotenv import load_dotenv
+load_dotenv()
+NEWS_API_KEY = os.environ.get('NEWS_API_KEY', '')
+
 # ─────────────────────────────────────────────
 # DATABASE
 # ─────────────────────────────────────────────
@@ -596,6 +600,23 @@ def transcribe():
     result = model.transcribe(wav_path)
     return jsonify({'transcript': result.get('text', '').strip()})
 
+@app.route('/news', methods=['POST'])
+def news():
+    if not NEWS_API_KEY:
+        return jsonify({'result': 'News API key not configured'}), 500
+    try:
+        url = f'https://newsapi.org/v2/top-headlines?language=en&pageSize=5&apiKey={NEWS_API_KEY}'
+        req = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/1.0'})
+        ctx = ssl.create_default_context()
+        with urllib.request.urlopen(req, context=ctx, timeout=8) as r:
+            data = json.loads(r.read().decode())
+        articles = data.get('articles', [])
+        if not articles:
+            return jsonify({'result': 'No news articles found'})
+        result = ' '.join(f"{a['title']}." for a in articles[:5])
+        return jsonify({'result': result})
+    except Exception as e:
+        return jsonify({'result': f'News error: {e}'}), 500
 
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
