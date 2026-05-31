@@ -21,7 +21,12 @@ export function detectIntent(text) {
   if (newsMatch) return { action: 'websearch', target: t };
 
   const weatherMatch = t.match(/(?:what(?:'s|is)\s+(?:the\s+)?weather|weather\s+in|how(?:'s|is)\s+(?:the\s+)?weather|will\s+it\s+rain|bring\s+(?:an?\s+)?umbrella|temperature\s+in)\s*(?:in\s+)?(.+)?/);
-  if (weatherMatch) return { action: 'weather', target: weatherMatch[1]?.trim() || 'Singapore' };
+  if (weatherMatch) {
+    const isTomorrow = t.includes('tomorrow');
+    let location = weatherMatch[1]?.trim() || 'Singapore';
+    location = location.replace(/tomorrow/g, '').replace(/\?/g, '').trim() || 'Singapore';
+    return { action: 'weather', target: location, tomorrow: isTomorrow };
+  }
 
   // Handle numbered email selection
   const numberMatch = t.match(/^(?:number\s+)?([1-9]\d*)(?:st|nd|rd|th)?$/);
@@ -236,13 +241,11 @@ export async function executeIntent(intent) {
   }
 
   if (intent.action === 'weather') {
-  const serverResult = await callServer('weather', { target: intent.target });
-  if (!serverResult) {
-    const msg = 'Could not fetch the weather right now.';
-    UI.addMessage('assistant', msg);
-    speak(msg);
-    return;
-  }
+  const serverResult = await callServer('weather', { 
+    target  : intent.target,
+    tomorrow: intent.tomorrow || false
+  });
+
   const summaryRes = await fetch(CONFIG.ollamaUrl, {
     method : 'POST',
     headers: { 'Content-Type': 'application/json' },

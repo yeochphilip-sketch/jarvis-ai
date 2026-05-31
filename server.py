@@ -683,14 +683,29 @@ reminder_thread.start()
 @app.route('/weather', methods=['POST'])
 def weather():
     location = request.json.get('target', 'Singapore').strip()
+    tomorrow = request.json.get('tomorrow', False)
     try:
         encoded = urllib.parse.quote(location)
-        url     = f'https://wttr.in/{encoded}?format=3'
-        req     = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/1.0'})
-        ctx     = ssl.create_default_context()
-        with urllib.request.urlopen(req, context=ctx, timeout=8) as r:
-            result = r.read().decode().strip()
-        return jsonify({'result': result})
+        if tomorrow:
+            # Get full forecast and extract tomorrow's data
+            url = f'https://wttr.in/{encoded}?format=j1'
+            req = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/1.0'})
+            ctx = ssl.create_default_context()
+            with urllib.request.urlopen(req, context=ctx, timeout=8) as r:
+                data = json.loads(r.read().decode())
+            tomorrow_data = data['weather'][1]  # index 1 = tomorrow
+            max_temp = tomorrow_data['maxtempC']
+            min_temp = tomorrow_data['mintempC']
+            desc     = tomorrow_data['hourly'][4]['weatherDesc'][0]['value']
+            rain     = tomorrow_data['hourly'][4]['chanceofrain']
+            result   = f"{location} tomorrow: {desc}, {min_temp}°C to {max_temp}°C, {rain}% chance of rain"
+        else:
+            url = f'https://wttr.in/{encoded}?format=3'
+            req = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/1.0'})
+            ctx = ssl.create_default_context()
+            with urllib.request.urlopen(req, context=ctx, timeout=8) as r:
+                result = r.read().decode().strip()
+        return jsonify({'result': result, 'location': location})
     except Exception as e:
         return jsonify({'result': f'Weather error: {e}'}), 500
 
