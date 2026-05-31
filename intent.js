@@ -86,7 +86,7 @@ export function detectIntent(text) {
   if (calTodayMatch) return { action: 'calendar_upcoming', target: '1' };
 
   //create calendar event
-  const calCreateMatch = t.match(/(?:add|create|schedule|set up)\s+(?:an?\s+)?(?:event|meeting|appointment|reminder)(.+)/);
+  const calCreateMatch = t.match(/(?:add|create|schedule|set up|set)\s+(?:an?\s+)?(?:a\s+)?(?:calendar\s+)?(?:event|meeting|appointment|reminder)(.+)/);
   if (calCreateMatch) return { action: 'calendar_create_nl', target: t };
 
   // Calendar this week
@@ -101,7 +101,7 @@ export function detectIntent(text) {
   const datetimeMatch = t.match(/what(?:'s|is)\s+(?:the\s+)?(?:time|date|day)/);
   if (datetimeMatch) return { action: 'datetime', target: 'now' };
 
-  // CPU usage
+  // CPU usage 
   const cpuMatch = t.match(/(?:what(?:'s|is)\s+(?:my\s+)?|check\s+(?:my\s+)?)(cpu|processor|usage)/);
   if (cpuMatch) return { action: 'sysinfo', target: cpuMatch[1] };
 
@@ -371,7 +371,23 @@ If no duration is specified, assume 1 hour. If no time is specified, assume 09:0
     speak(msg);
     return;
   }
-  const event = JSON.parse(jsonMatch[0]);
+  let event;
+  try {
+    event = JSON.parse(jsonMatch[0]);
+  } catch {
+    const msg = 'I could not parse the event details. Please try again with a specific time and title.';
+    UI.addMessage('assistant', msg);
+    speak(msg);
+    return;
+  }
+  if (!event.end && event.start) {
+    const startDate = new Date(event.start);
+    startDate.setHours(startDate.getHours() + 1);
+    event.end = startDate.toISOString().replace('Z', '+08:00');
+  }
+  if (!event.summary) {
+    event.summary = 'New Event';
+  }
   const result = await callServer('calendar/create', event);
   const msg = result ?? 'Could not create the event.';
   UI.addMessage('assistant', msg);

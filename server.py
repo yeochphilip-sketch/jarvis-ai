@@ -5,7 +5,7 @@ import urllib.request, urllib.parse, json, ssl
 from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "https://localhost:5500"}}, supports_credentials=True)
+CORS(app)
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -628,6 +628,54 @@ def news():
         return jsonify({'result': result})
     except Exception as e:
         return jsonify({'result': f'News error: {e}'}), 500
+
+# ─────────────────────────────────────────────
+# CALENDAR REMINDER BACKGROUND THREAD
+# ─────────────────────────────────────────────
+_reminded_events = set()  # tracks events already alerted to avoid repeating
+
+def calendar_reminder_loop():
+    while True:
+        try:
+            svc = google_build('calendar', 'v3')
+            if svc:
+                now     = datetime.now(timezone.utc)
+                soon    = now + timedelta(minutes=16)
+                cutoff  = now + timedelta(minutes=14)
+                events  = svc.events().list(
+                    calendarId   = 'primary',
+                    timeMin      = cutoff.isoformat(),
+                    timeMax      = soon.isoformat(),
+                    maxResults   = 5,
+                    singleEvents = True,
+                    orderBy      = 'startTime'
+                ).execute().get('items', [])
+
+                for event in events:
+                    event_id = event.get('id')
+                    summary  = event.get('summary', 'Untitled event')
+                    start    = event['start'].get('dateTime', '')
+
+                    if event_id and event_id not in _reminded_events:
+                        _reminded_events.add(event_id)
+                        if 'T' in start:
+                            dt       = datetime.fromisoformat(start)
+                            time_str = dt.strftime('%I:%M %p')
+                        else:
+                            time_str = start
+                        alert = f'Reminder: {summary} starts in 15 minutes at {time_str}.'
+                        print(f'[reminder] {alert}')
+                        # Speak the reminder via macOS say command
+                        subprocess.Popen([
+                            'say', '-v', 'Daniel', '-r', '165', alert
+                        ])
+        except Exception as e:
+            print(f'[reminder] error: {e}')
+        time.sleep(60)  # check every minute
+
+# Start the reminder thread on server boot
+reminder_thread = threading.Thread(target=calendar_reminder_loop, daemon=True)
+reminder_thread.start()
 
 # ─────────────────────────────────────────────
 if __name__ == '__main__':

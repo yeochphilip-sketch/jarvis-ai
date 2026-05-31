@@ -114,14 +114,23 @@ function startSilenceDetection() {
 }
 
 function isValidTranscript(text) {
-  // Reject if more than 30% non-ASCII characters (catches CJK hallucinations)
-  const nonAscii = (text.match(/[^\x00-\x7F]/g) || []).length;
-  if (nonAscii / text.length > 0.3) return false;
-  // Reject repetitive tokens like "1.5% 1.5% 1.5%"
-  const words = text.trim().split(/\s+/);
+  const t = text.trim();
+  // Reject very short transcripts
+  if (t.length < 3) return false;
+  // Reject if more than 30% non-ASCII characters
+  const nonAscii = (t.match(/[^\x00-\x7F]/g) || []).length;
+  if (nonAscii / t.length > 0.3) return false;
+  // Reject repetitive tokens
+  const words = t.split(/\s+/);
   if (words.length >= 3) {
     const unique = new Set(words);
     if (unique.size / words.length < 0.4) return false;
+  }
+  // Reject if same word appears more than twice
+  const wordCounts = {};
+  for (const w of words) {
+    wordCounts[w] = (wordCounts[w] || 0) + 1;
+    if (wordCounts[w] > 2) return false;
   }
   return true;
 }
