@@ -708,7 +708,47 @@ def weather():
         return jsonify({'result': result, 'location': location})
     except Exception as e:
         return jsonify({'result': f'Weather error: {e}'}), 500
-
+# ─────────────────────────────────────────────
+# SPOTIFY
+# ─────────────────────────────────────────────
+@app.route('/spotify', methods=['POST'])
+def spotify():
+    command = request.json.get('target', '').strip().lower()
+    try:
+        if command == 'play':
+            subprocess.run(['osascript', '-e', 'tell application "Spotify" to play'])
+            return jsonify({'result': 'Playing Spotify.'})
+        elif command == 'pause':
+            subprocess.run(['osascript', '-e', 'tell application "Spotify" to pause'])
+            return jsonify({'result': 'Spotify paused.'})
+        elif command == 'next':
+            subprocess.run(['osascript', '-e', 'tell application "Spotify" to next track'])
+            return jsonify({'result': 'Skipped to next track.'})
+        elif command == 'previous':
+            subprocess.run(['osascript', '-e', 'tell application "Spotify" to previous track'])
+            return jsonify({'result': 'Went back to previous track.'})
+        elif command == 'shuffle':
+            subprocess.run(['osascript', '-e', 'tell application "Spotify" to set shuffling to true'])
+            return jsonify({'result': 'Shuffle enabled.'})
+        elif command.startswith('volume'):
+            level = re.search(r'\d+', command)
+            if level:
+                vol = max(0, min(100, int(level.group())))
+                subprocess.run(['osascript', '-e', f'tell application "Spotify" to set sound volume to {vol}'])
+                return jsonify({'result': f'Spotify volume set to {vol}.'})
+        elif command.startswith('play '):
+            search = command[5:].strip()
+            script = f'''
+tell application "Spotify"
+    activate
+    search for "{search}"
+end tell
+'''
+            subprocess.run(['osascript', '-e', script])
+            return jsonify({'result': f'Searching Spotify for {search}.'})
+        return jsonify({'result': 'Unknown Spotify command.'}), 400
+    except Exception as e:
+        return jsonify({'result': f'Spotify error: {e}'}), 500
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
     import ssl

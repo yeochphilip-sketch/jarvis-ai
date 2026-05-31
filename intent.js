@@ -39,6 +39,21 @@ export function detectIntent(text) {
     }
   }
 
+  const spotifyPlay = t.match(/^play\s+(.+)\s+on\s+spotify$|^spotify\s+play\s+(.+)$/);
+  if (spotifyPlay) return { action: 'spotify', target: `play ${spotifyPlay[1] || spotifyPlay[2]}` };
+
+  const spotifyMatch = t.match(/^(?:spotify\s+)?(pause|next|previous|shuffle|stop)(?:\s+spotify)?$|^skip\s+(?:track|song)$|^next\s+(?:track|song)$/);
+  if (spotifyMatch) {
+    const cmd = t.includes('skip') || t.includes('next') ? 'next' : 
+                t.includes('previous') ? 'previous' :
+                t.includes('pause') || t.includes('stop') ? 'pause' :
+                t.includes('shuffle') ? 'shuffle' : spotifyMatch[1];
+    return { action: 'spotify', target: cmd };
+  }
+
+  const spotifyVolumeMatch = t.match(/spotify\s+volume\s+(?:to\s+)?(\d+)/);
+  if (spotifyVolumeMatch) return { action: 'spotify', target: `volume ${spotifyVolumeMatch[1]}` };
+
   // Handle named email selection
   if (STATE.pendingEmails && STATE.pendingEmails.length > 0) {
     const cleaned = t
@@ -287,6 +302,7 @@ export async function executeIntent(intent) {
     calendar_upcoming : serverResult,
     calendar_create   : serverResult,
     weather : serverResult,
+    spotify : serverResult,
   };
 
   const msg = serverResult
