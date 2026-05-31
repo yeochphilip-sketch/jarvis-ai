@@ -678,6 +678,23 @@ reminder_thread = threading.Thread(target=calendar_reminder_loop, daemon=True)
 reminder_thread.start()
 
 # ─────────────────────────────────────────────
+# WEATHER
+# ─────────────────────────────────────────────
+@app.route('/weather', methods=['POST'])
+def weather():
+    location = request.json.get('target', 'Singapore').strip()
+    try:
+        encoded = urllib.parse.quote(location)
+        url     = f'https://wttr.in/{encoded}?format=3'
+        req     = urllib.request.Request(url, headers={'User-Agent': 'Jarvis/1.0'})
+        ctx     = ssl.create_default_context()
+        with urllib.request.urlopen(req, context=ctx, timeout=8) as r:
+            result = r.read().decode().strip()
+        return jsonify({'result': result})
+    except Exception as e:
+        return jsonify({'result': f'Weather error: {e}'}), 500
+
+# ─────────────────────────────────────────────
 if __name__ == '__main__':
     import ssl
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

@@ -20,6 +20,9 @@ export function detectIntent(text) {
   const newsMatch = /\bnews\b/.test(t) && /latest|current|recent|today|briefing|headlines/.test(t);
   if (newsMatch) return { action: 'websearch', target: t };
 
+  const weatherMatch = t.match(/(?:what(?:'s|is)\s+(?:the\s+)?weather|weather\s+in|how(?:'s|is)\s+(?:the\s+)?weather|will\s+it\s+rain|bring\s+(?:an?\s+)?umbrella|temperature\s+in)\s*(?:in\s+)?(.+)?/);
+  if (weatherMatch) return { action: 'weather', target: weatherMatch[1]?.trim() || 'Singapore' };
+
   // Handle numbered email selection
   const numberMatch = t.match(/^(?:number\s+)?([1-9]\d*)(?:st|nd|rd|th)?$/);
   if (numberMatch && STATE.pendingEmails && STATE.pendingEmails.length > 0) {
@@ -232,6 +235,37 @@ export async function executeIntent(intent) {
   return;
   }
 
+  if (intent.action === 'weather') {
+  const serverResult = await callServer('weather', { target: intent.target });
+  if (!serverResult) {
+    const msg = 'Could not fetch the weather right now.';
+    UI.addMessage('assistant', msg);
+    speak(msg);
+    return;
+  }
+  const summaryRes = await fetch(CONFIG.ollamaUrl, {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({
+      model  : CONFIG.model,
+      stream : false,
+      messages: [
+        {
+          role   : 'system',
+          content: 'Convert this weather data into one natural spoken sentence. No bullet points. No markdown. Just a clean sentence.'
+        },
+        { role: 'user', content: serverResult }
+      ]
+    })
+  });
+  const summaryData = await summaryRes.json();
+  const msg = summaryData.message?.content?.trim() ?? serverResult;
+  UI.addMessage('assistant', msg);
+  speak(msg);
+  STATE.history.push({ role: 'assistant', content: msg });
+  return;
+  }
+
   const serverResult = await callServer(
     intent.action.replace('_', '/'),
     { target: intent.target }
@@ -249,6 +283,7 @@ export async function executeIntent(intent) {
     datetime          : serverResult,
     calendar_upcoming : serverResult,
     calendar_create   : serverResult,
+    weather : serverResult,
   };
 
   const msg = serverResult
