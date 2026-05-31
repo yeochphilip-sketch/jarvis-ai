@@ -594,10 +594,16 @@ def transcribe():
                    capture_output=True)
 
     result = model.transcribe(wav_path)
-    return jsonify({'text': result.get('text', '').strip()})
+    return jsonify({'transcript': result.get('text', '').strip()})
 
 
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
-    print('Jarvis server running on http://localhost:5001')
-    app.run(port=5001, debug=False)
+    import ssl
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(
+        '/Users/philipyeo/jarvis/127.0.0.1+1.pem',
+        '/Users/philipyeo/jarvis/127.0.0.1+1-key.pem'
+    )
+    print('Jarvis server running on https://localhost:5001')
+    app.run(port=5001, debug=False, ssl_context=ctx)

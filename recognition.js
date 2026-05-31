@@ -94,7 +94,7 @@ function startSilenceDetection() {
     analyser.getByteFrequencyData(data);
     const avg = data.reduce((a, b) => a + b, 0) / data.length;
 
-    if (avg < 6) {
+    if (avg < 15) {
       // Silence — schedule a stop if not already pending
       if (!silenceTimer) {
         silenceTimer = setTimeout(() => {

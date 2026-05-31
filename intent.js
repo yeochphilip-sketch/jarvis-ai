@@ -15,8 +15,10 @@ export function detectIntent(text) {
   const searchMatch = t.match(/^(?:search(?:\s+for)?|look\s+up|google)\s+(.+)$/);
   if (searchMatch) return { action: 'search', target: searchMatch[1].trim() };
 
-  const newsMatch = t.match(/(?:latest|current|recent|today'?s?)\s+news|what(?:'s|\s+is)\s+(?:the\s+)?news|news\s+today/);
-  if (newsMatch) return { action: 'websearch', target: 'latest news today' };
+  // News queries — route to web search, never Llama
+  // News queries
+  const newsMatch = /\bnews\b/.test(t) && /latest|current|recent|today|briefing|headlines/.test(t);
+  if (newsMatch) return { action: 'websearch', target: t };
 
   // Handle numbered email selection
   const numberMatch = t.match(/^(?:number\s+)?([1-9]\d*)(?:st|nd|rd|th)?$/);
@@ -115,11 +117,8 @@ export function detectIntent(text) {
   const gmailMatch = t.match(/(?:check|read|triage|show)\s+(?:my\s+)?(?:emails?|inbox|gmail)/);
   if (gmailMatch) return { action: 'gmail_triage', target: 'unread' };
 
-  // Web search / news
-  const newsMatch = t.match(/(?:latest|current|recent|today'?s?)\s+news|what(?:'s|\s+is)\s+(?:the\s+)?news/);
-  if (newsMatch) return { action: 'websearch', target: 'latest news today' };
-
-  const webSearchMatch = t.match(/^(?:search(?:\s+the)?\s+(?:web|internet|news)|what(?:'s|\s+is)\s+(?:the\s+)?(?:latest|current|recent)|find\s+news\s+about)\s+(.+)$/);
+  // General web search
+  const webSearchMatch = t.match(/^(?:search(?:\s+the)?\s+(?:web|internet|news)|find\s+news\s+about)\s+(.+)$/);
   if (webSearchMatch) return { action: 'websearch', target: webSearchMatch[1].trim() };
 
   return null;
@@ -214,7 +213,6 @@ export async function callServer(endpoint, data) {
 
 // ── Execute ───────────────────────────────────────────────────────────────────
 export async function executeIntent(intent) {
-  // Special handlers that need custom logic
   if (intent.action === 'gmail_triage') {
     await handleGmailTriage();
     return;
@@ -270,7 +268,6 @@ async function handleWebSearch(query) {
     if (data.error) throw new Error(data.error);
     if (!data.result) throw new Error('No results returned');
 
-    // Ask Llama to summarise into Jarvis-style sentences
     const summaryRes = await fetch(CONFIG.ollamaUrl, {
       method : 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -338,11 +335,11 @@ async function handleGmailTriage() {
 
   for (const email of emails) {
     try {
-      const classifyRes = await fetch('http://localhost:11434/api/chat', {
+      const classifyRes = await fetch(CONFIG.ollamaUrl, {
         method : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body   : JSON.stringify({
-          model   : 'llama3.2',
+          model   : CONFIG.model,
           stream  : false,
           messages: [
             {
@@ -361,11 +358,11 @@ async function handleGmailTriage() {
       const isImportant  = verdict.includes('important') && !verdict.includes('unimportant');
 
       if (isImportant) {
-        const summaryRes = await fetch('http://localhost:11434/api/chat', {
+        const summaryRes = await fetch(CONFIG.ollamaUrl, {
           method : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body   : JSON.stringify({
-            model   : 'llama3.2',
+            model   : CONFIG.model,
             stream  : false,
             messages: [
               {
@@ -401,15 +398,14 @@ async function handleGmailTriage() {
     }
   }
 
-  // Rank important emails by priority
   let rankedEmails = importantEmails;
   if (importantEmails.length > 1) {
     try {
-      const rankRes = await fetch('http://localhost:11434/api/chat', {
+      const rankRes = await fetch(CONFIG.ollamaUrl, {
         method : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body   : JSON.stringify({
-          model   : 'llama3.2',
+          model   : CONFIG.model,
           stream  : false,
           messages: [
             {
