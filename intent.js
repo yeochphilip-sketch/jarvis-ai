@@ -148,6 +148,14 @@ export function detectIntent(text) {
   const webSearchMatch = t.match(/^(?:search(?:\s+the)?\s+(?:web|internet|news)|find\s+news\s+about)\s+(.+)$/);
   if (webSearchMatch) return { action: 'websearch', target: webSearchMatch[1].trim() };
 
+  if (t.includes('connect spotify') || t.includes('authenticate spotify')) {
+  return { action: 'spotify_login', target: '' };
+  }
+
+  if (t.includes('what is playing') || t.includes("what's playing") || t.includes('current track')) {
+  return { action: 'spotify', target: 'current track' };
+  }
+
   return null;
 }
 
@@ -251,8 +259,18 @@ export async function executeIntent(intent) {
   }
 
   if (intent.action === 'calendar_create_nl') {
-  await handleCalendarCreate(intent.target);
-  return;
+    await handleCalendarCreate(intent.target);
+    return;
+  }
+
+  if (intent.action === 'spotify_login') {
+    const res  = await fetch(`${CONFIG.flaskUrl}/spotify/login`);
+    const data = await res.json();
+    window.open(data.url, '_blank');
+    const msg = 'Opening Spotify login. Authenticate and come back.';
+    UI.addMessage('assistant', msg);
+    speak(msg);
+    return;
   }
 
   if (intent.action === 'weather') {
@@ -260,6 +278,16 @@ export async function executeIntent(intent) {
     target  : intent.target,
     tomorrow: intent.tomorrow || false
   });
+
+  if (intent.action === 'spotify_login') {
+  const res    = await fetch(`${CONFIG.flaskUrl}/spotify/login`);
+  const data   = await res.json();
+  window.open(data.url, '_blank');
+  const msg = 'Opening Spotify login. Authenticate and come back.';
+  UI.addMessage('assistant', msg);
+  speak(msg);
+  return;
+  }
 
   const summaryRes = await fetch(CONFIG.ollamaUrl, {
     method : 'POST',

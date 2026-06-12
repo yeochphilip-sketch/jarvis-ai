@@ -4,11 +4,23 @@ import subprocess, os, time, threading, sqlite3, re
 import urllib.request, urllib.parse, json, ssl
 from datetime import datetime, timezone, timedelta
 
+SPOTIFY_CLIENT_ID     = os.environ.get('SPOTIFY_CLIENT_ID', '')
+SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET', '')
+SPOTIFY_TOKEN         = {'access_token': None, 'refresh_token': None, 'expires_at': 0}
+
 app = Flask(__name__)
 CORS(app)
 
-from dotenv import load_dotenv
-load_dotenv()
+# Manually load .env to ensure values are available under launchd
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith('#') and '=' in _line:
+                _k, _v = _line.split('=', 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 NEWS_API_KEY = os.environ.get('NEWS_API_KEY', '')
 
 # ─────────────────────────────────────────────
@@ -714,41 +726,139 @@ def weather():
 @app.route('/spotify', methods=['POST'])
 def spotify():
     command = request.json.get('target', '').strip().lower()
+    token   = get_spotify_token()
+    if not token:
+        return jsonify({'result': 'Spotify not authenticated. Say "connect Spotify" first.'})
     try:
         if command == 'play':
-            subprocess.run(['osascript', '-e', 'tell application "Spotify" to play'])
-            return jsonify({'result': 'Playing Spotify.'})
-        elif command == 'pause':
-            subprocess.run(['osascript', '-e', 'tell application "Spotify" to pause'])
-            return jsonify({'result': 'Spotify paused.'})
-        elif command == 'next':
-            subprocess.run(['osascript', '-e', 'tell application "Spotify" to next track'])
+            spotify_api('PUT', '/me/player/play')
+            return jsonify({'result': 'Playing.'})
+        elif command in ('pause', 'stop'):
+            spotify_api('PUT', '/me/player/pause')
+            return jsonify({'result': 'Paused.'})
+        elif command in ('next', 'skip'):
+            spotify_api('POST', '/me/player/next')
             return jsonify({'result': 'Skipped to next track.'})
         elif command == 'previous':
-            subprocess.run(['osascript', '-e', 'tell application "Spotify" to previous track'])
+            spotify_api('POST', '/me/player/previous')
             return jsonify({'result': 'Went back to previous track.'})
         elif command == 'shuffle':
-            subprocess.run(['osascript', '-e', 'tell application "Spotify" to set shuffling to true'])
+            spotify_api('PUT', '/me/player/shuffle?state=true')
             return jsonify({'result': 'Shuffle enabled.'})
         elif command.startswith('volume'):
             level = re.search(r'\d+', command)
             if level:
                 vol = max(0, min(100, int(level.group())))
-                subprocess.run(['osascript', '-e', f'tell application "Spotify" to set sound volume to {vol}'])
+                spotify_api('PUT', f'/me/player/volume?volume_percent={vol}')
                 return jsonify({'result': f'Spotify volume set to {vol}.'})
         elif command.startswith('play '):
             search = command[5:].strip()
-            script = f'''
-tell application "Spotify"
-    activate
-    search for "{search}"
-end tell
-'''
-            subprocess.run(['osascript', '-e', script])
-            return jsonify({'result': f'Searching Spotify for {search}.'})
+            results, err = spotify_api('GET', f'/search?q={urllib.parse.quote(search)}&type=track&limit=1')
+            if err or not results:
+                return jsonify({'result': f'Could not find {search}.'})
+            tracks = results.get('tracks', {}).get('items', [])
+            if not tracks:
+                return jsonify({'result': f'No results for {search}.'})
+            uri = tracks[0]['uri']
+            spotify_api('PUT', '/me/player/play', {'uris': [uri]})
+            name   = tracks[0]['name']
+            artist = tracks[0]['artists'][0]['name']
+            return jsonify({'result': f'Playing {name} by {artist}.'})
+        elif command == 'what is playing' or command == 'current track':
+            result, err = spotify_api('GET', '/me/player/currently-playing')
+            if err or not result:
+                return jsonify({'result': 'Nothing is playing.'})
+            item   = result.get('item', {})
+            name   = item.get('name', 'Unknown')
+            artist = item.get('artists', [{}])[0].get('name', 'Unknown')
+            return jsonify({'result': f'Currently playing {name} by {artist}.'})
         return jsonify({'result': 'Unknown Spotify command.'}), 400
     except Exception as e:
         return jsonify({'result': f'Spotify error: {e}'}), 500
+# ─────────────────────────────────────────────
+# SPOTIFY OAUTH
+# ─────────────────────────────────────────────
+@app.route('/spotify/login', methods=['GET'])
+def spotify_login():
+    scope = 'user-modify-playback-state user-read-playback-state user-read-currently-playing'
+    params = urllib.parse.urlencode({
+        'client_id'     : SPOTIFY_CLIENT_ID,
+        'response_type' : 'code',
+        'redirect_uri'  : 'https://localhost:5001/spotify/callback',
+        'scope'         : scope,
+    })
+    return jsonify({'url': f'https://accounts.spotify.com/authorize?{params}'})
+
+@app.route('/spotify/callback', methods=['GET'])
+def spotify_callback():
+    code = request.args.get('code')
+    if not code:
+        return 'No code received', 400
+    credentials = f'{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}'
+    encoded     = __import__('base64').b64encode(credentials.encode()).decode()
+    data        = urllib.parse.urlencode({
+        'grant_type'  : 'authorization_code',
+        'code'        : code,
+        'redirect_uri': 'https://localhost:5001/spotify/callback',
+    }).encode()
+    req = urllib.request.Request(
+        'https://accounts.spotify.com/api/token',
+        data    = data,
+        headers = {
+            'Authorization': f'Basic {encoded}',
+            'Content-Type' : 'application/x-www-form-urlencoded',
+        }
+    )
+    ctx = ssl.create_default_context()
+    with urllib.request.urlopen(req, context=ctx) as r:
+        tokens = json.loads(r.read().decode())
+    SPOTIFY_TOKEN['access_token']  = tokens['access_token']
+    SPOTIFY_TOKEN['refresh_token'] = tokens.get('refresh_token')
+    SPOTIFY_TOKEN['expires_at']    = time.time() + tokens['expires_in']
+    return '<h1>Spotify connected. You can close this tab.</h1>'
+
+def get_spotify_token():
+    if time.time() < SPOTIFY_TOKEN['expires_at'] - 60:
+        return SPOTIFY_TOKEN['access_token']
+    if not SPOTIFY_TOKEN['refresh_token']:
+        return None
+    credentials = f'{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}'
+    encoded     = __import__('base64').b64encode(credentials.encode()).decode()
+    data        = urllib.parse.urlencode({
+        'grant_type'   : 'refresh_token',
+        'refresh_token': SPOTIFY_TOKEN['refresh_token'],
+    }).encode()
+    req = urllib.request.Request(
+        'https://accounts.spotify.com/api/token',
+        data    = data,
+        headers = {
+            'Authorization': f'Basic {encoded}',
+            'Content-Type' : 'application/x-www-form-urlencoded',
+        }
+    )
+    ctx = ssl.create_default_context()
+    with urllib.request.urlopen(req, context=ctx) as r:
+        tokens = json.loads(r.read().decode())
+    SPOTIFY_TOKEN['access_token'] = tokens['access_token']
+    SPOTIFY_TOKEN['expires_at']   = time.time() + tokens['expires_in']
+    return SPOTIFY_TOKEN['access_token']
+
+def spotify_api(method, endpoint, body=None):
+    token = get_spotify_token()
+    if not token:
+        return None, 'Not authenticated'
+    url     = f'https://api.spotify.com/v1{endpoint}'
+    headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+    data    = json.dumps(body).encode() if body else None
+    req     = urllib.request.Request(url, data=data, headers=headers, method=method)
+    ctx     = ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(req, context=ctx) as r:
+            text = r.read().decode()
+            return json.loads(text) if text else {}, None
+    except urllib.error.HTTPError as e:
+        return None, f'Spotify API error {e.code}'
+
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
     import ssl
