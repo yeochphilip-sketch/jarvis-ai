@@ -48,26 +48,19 @@ export const Health = {
       this.render(data);
       this.showMetrics();
       
+      // Notification for low sleep score
+      if (data.sleep_score && data.sleep_score < 60) {
+        new Notification("Jarvis", {
+          body: "Sleep score is low today. Consider a rest day."
+        });
+      }
+      
     } catch (err) {
       console.error('[Health] fetch error:', err);
       this.showError('Connection failed: ' + err.message);
     }
   },
-  async loadTrends() {
-  const dates = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    dates.push(d.toISOString().split('T')[0]);
-  }
   
-  const trendData = await Promise.all(
-    dates.map(date => fetch(`${API_BASE}/health/${date}`).catch(() => null))
-  );
-  
-  // Render a simple SVG sparkline
-  this.renderSparkline('sleep-trend', trendData.map(d => d?.sleep_score));
-  }
   render(data) {
     const set = (id, val) => {
       const el = document.getElementById(id);
@@ -109,22 +102,4 @@ export const Health = {
       if (p) p.textContent = msg;
     }
   }
-
-  renderWorkout(data) {
-  const typeEl = document.getElementById('h-workout-type');
-  const card = document.getElementById('health-workout-card');
-  
-  if (typeEl) typeEl.textContent = data.workout_type;
-  if (card) {
-    card.className = 'health-workout';
-    if (data.workout_type === 'rest') card.classList.add('rest-day');
-    if (data.intensity === 'high') card.classList.add('high-intensity');
-    }
-  }
-  if (data.sleep_score && data.sleep_score < 60) {
-  new Notification("Jarvis", {
-    body: "Sleep score is low today. Consider a rest day."
-  });
-  }
 };
-

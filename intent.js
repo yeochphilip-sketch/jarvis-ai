@@ -258,15 +258,16 @@ export async function callServer(endpoint, data) {
 
 // ── Execute ───────────────────────────────────────────────────────────────────
 export async function executeIntent(intent) {
-  case 'health':
-  DOM.healthPanel.classList.add('open');
-  if (intent.action === 'refresh') {
-    await fetch(`${CONFIG.flaskUrl}/health/refresh`, {method: 'POST'});
+  if (intent.type === 'health' || intent.action === 'show') {
+    DOM.healthPanel.classList.add('open');
+    if (intent.action === 'refresh') {
+      await fetch(`${CONFIG.flaskUrl}/health/refresh`, {method: 'POST'});
+    }
+    Health.loadData();
+    speak("Here's your health data.");
+    return;  // exit early
   }
-  Health.loadData();
-  speak("Here's your health data.");
-  break;
-  
+
   if (intent.action === 'gmail_triage') {
     await handleGmailTriage();
     return;

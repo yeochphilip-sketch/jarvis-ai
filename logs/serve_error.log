@@ -1142,3 +1142,69 @@
 127.0.0.1 - - [19/Jun/2026 21:18:16] "GET /ui.js HTTP/1.1" 200 -
 127.0.0.1 - - [19/Jun/2026 21:18:31] code 404, message File not found
 127.0.0.1 - - [19/Jun/2026 21:18:31] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [19/Jun/2026 21:39:44] "GET /MainIndex.html HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] code 404, message File not found
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /style.css?v=2 HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /main.js?v=2 HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /config.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /state.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /dom.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /orb.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /memory.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /llama.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /intent.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /speech.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /recognition.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /ui.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:45] "GET /health.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /MainIndex.html HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /style.css?v=2 HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /main.js?v=2 HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] code 404, message File not found
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /config.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /state.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /dom.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /memory.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /llama.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /intent.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /speech.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /orb.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /recognition.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /ui.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:39:55] "GET /health.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /MainIndex.html HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] code 404, message File not found
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /style.css?v=2 HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /main.js?v=3 HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /state.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /config.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /dom.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /llama.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /orb.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /memory.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /intent.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /speech.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /recognition.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /ui.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:44:45] "GET /health.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:48] "GET /MainIndex.html HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] code 404, message File not found
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /style.css?v=2 HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /main.js?v=3 HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /config.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /dom.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /state.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /orb.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /llama.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /intent.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /speech.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /memory.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /ui.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /recognition.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:49:49] "GET /health.js HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 21:50:26] code 404, message File not found
+127.0.0.1 - - [19/Jun/2026 21:50:26] "GET /favicon.ico HTTP/1.1" 404 -
