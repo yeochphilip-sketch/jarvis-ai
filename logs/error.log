@@ -3448,3 +3448,57 @@ Error: ExtAudioFileCreateWithURL failed (-48)
 [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on https://127.0.0.1:5001
 [33mPress CTRL+C to quit[0m
+127.0.0.1 - - [12/Jun/2026 21:59:47] "GET /memory/load HTTP/1.1" 200 -
+127.0.0.1 - - [12/Jun/2026 21:59:50] "OPTIONS /datetime HTTP/1.1" 200 -
+127.0.0.1 - - [12/Jun/2026 21:59:50] "OPTIONS /calendar/upcoming HTTP/1.1" 200 -
+127.0.0.1 - - [12/Jun/2026 21:59:50] "OPTIONS /gmail/count HTTP/1.1" 200 -
+127.0.0.1 - - [12/Jun/2026 21:59:50] "OPTIONS /weather HTTP/1.1" 200 -
+127.0.0.1 - - [12/Jun/2026 21:59:50] "POST /datetime HTTP/1.1" 200 -
+127.0.0.1 - - [12/Jun/2026 21:59:50] "POST /calendar/upcoming HTTP/1.1" 200 -
+127.0.0.1 - - [12/Jun/2026 21:59:55] "POST /gmail/count HTTP/1.1" 200 -
+127.0.0.1 - - [12/Jun/2026 21:59:55] "POST /weather HTTP/1.1" 200 -
+/Users/philipyeo/jarvis/venv/lib/python3.14/site-packages/whisper/transcribe.py:132: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+127.0.0.1 - - [12/Jun/2026 22:07:02] "POST /transcribe HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:42:39] "GET /memory/load HTTP/1.1" 200 -
+/Users/philipyeo/jarvis/venv/lib/python3.14/site-packages/whisper/transcribe.py:132: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+127.0.0.1 - - [13/Jun/2026 07:42:43] "OPTIONS /datetime HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:42:43] "OPTIONS /calendar/upcoming HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:42:43] "OPTIONS /gmail/count HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:42:43] "OPTIONS /weather HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:42:43] "POST /datetime HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:42:43] "POST /transcribe HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:43:09] "[35m[1mPOST /weather HTTP/1.1[0m" 500 -
+127.0.0.1 - - [13/Jun/2026 07:43:09] "POST /gmail/count HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:43:09] "POST /calendar/upcoming HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:43:25] "OPTIONS /speak HTTP/1.1" 200 -
+/Users/philipyeo/jarvis/venv/lib/python3.14/site-packages/whisper/transcribe.py:132: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+127.0.0.1 - - [13/Jun/2026 07:43:39] "POST /speak HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:43:39] "OPTIONS /speak HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:43:46] "POST /speak HTTP/1.1" 200 -
+127.0.0.1 - - [13/Jun/2026 07:44:18] "POST /transcribe HTTP/1.1" 200 -
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on https://127.0.0.1:5001
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [19/Jun/2026 18:32:55] "GET /memory/load HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:05] "OPTIONS /datetime HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:05] "OPTIONS /calendar/upcoming HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:05] "OPTIONS /gmail/count HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:05] "OPTIONS /weather HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:05] "POST /datetime HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:06] "POST /calendar/upcoming HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:06] "POST /weather HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:06] "POST /gmail/count HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:18] "OPTIONS /speak HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:28] "POST /speak HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:29] "OPTIONS /speak HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:31] "POST /speak HTTP/1.1" 200 -
+127.0.0.1 - - [19/Jun/2026 18:33:33] "POST /speak HTTP/1.1" 200 -
+/Users/philipyeo/jarvis/venv/lib/python3.14/site-packages/whisper/transcribe.py:132: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+127.0.0.1 - - [19/Jun/2026 18:33:38] "POST /transcribe HTTP/1.1" 200 -
+/Users/philipyeo/jarvis/venv/lib/python3.14/site-packages/whisper/transcribe.py:132: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+127.0.0.1 - - [19/Jun/2026 18:33:52] "POST /transcribe HTTP/1.1" 200 -

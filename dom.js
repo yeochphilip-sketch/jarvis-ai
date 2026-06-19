@@ -36,4 +36,6 @@ export const DOM = {
   memoryList  : document.getElementById('memory-list'),
   memoryEmpty : document.getElementById('memory-empty'),
   memoryCount : document.getElementById('memory-count'),
+
+  Health.init();
 };

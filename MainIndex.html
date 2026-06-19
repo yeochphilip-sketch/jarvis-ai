@@ -10,7 +10,7 @@
 </head>
 <body>
 
-<!-- AMENDED: init modal unchanged -->
+<!-- INIT MODAL -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <div class="modal-title"><span>JARVIS</span> // INIT</div>
@@ -21,11 +21,10 @@
   </div>
 </div>
 
-<!-- AMENDED: entire app structure replaced. old header+messages+sidebar+input
-     is now two layers: the jarvis-screen (circle) and chat-panel (slides in from right) -->
+<!-- MAIN SCREEN -->
 <div class="jarvis-screen" id="jarvis-screen">
 
-  <!-- AMENDED: circle orb with three rings that animate based on state -->
+  <!-- ORB -->
   <div class="orb-wrapper" id="orb-wrapper">
     <div class="orb-ring orb-ring-outer" id="orb-outer"></div>
     <div class="orb-ring orb-ring-inner"></div>
@@ -34,21 +33,33 @@
     </div>
   </div>
 
-  <!-- AMENDED: status text sits below the circle -->
+  <!-- STATUS -->
   <div class="orb-status" id="orb-status">IDLE</div>
-    <!-- Subtitle display: user question and Jarvis sentence -->
-    <div class="subtitle-area">
-      <div class="subtitle-user"  id="subtitle-user"></div>
-      <div class="subtitle-jarvis" id="subtitle-jarvis"></div>
-    </div>
-  <!-- AMENDED: bottom bar holds mic, text input, and chat toggle -->
+  
+  <!-- SUBTITLES -->
+  <div class="subtitle-area">
+    <div class="subtitle-user" id="subtitle-user"></div>
+    <div class="subtitle-jarvis" id="subtitle-jarvis"></div>
+  </div>
+
+  <!-- BOTTOM BAR: Health | Mic | Input | Chat -->
   <div class="orb-bar">
+    <!-- Health toggle (left side) -->
+    <button class="orb-btn health-toggle-btn" id="health-toggle" disabled title="Health data">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 14s-4-3.5-4-6a4 4 0 018 0c0 2.5-4 6-4 6z"/>
+      </svg>
+    </button>
+    
+    <!-- Mic -->
     <button class="orb-btn mic-btn" id="mic-btn" disabled title="Click to speak">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <rect x="5" y="1" width="6" height="9" rx="3"/>
         <path d="M2 8a6 6 0 0012 0M8 14v2"/>
       </svg>
     </button>
+    
+    <!-- Input -->
     <div class="orb-input-wrap">
       <textarea id="input" rows="1" placeholder="Ask Jarvis anything..." disabled></textarea>
       <button class="send-btn" id="send-btn" disabled>
@@ -57,7 +68,8 @@
         </svg>
       </button>
     </div>
-    <!-- AMENDED: new toggle button to open/close chat panel -->
+    
+    <!-- Chat toggle (right side) -->
     <button class="orb-btn chat-toggle-btn" id="chat-toggle" disabled title="Toggle chat">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M14 10c0 .667-.333 1-1 1H4l-3 3V3c0-.667.333-1 1-1h11c.667 0 1 .333 1 1v7z"/>
@@ -74,17 +86,77 @@
   </div>
 </div>
 
-<!-- AMENDED: chat panel slides in from the right, toggled by the button above -->
+<!-- HEALTH PANEL (slides from LEFT) -->
+<div class="health-panel" id="health-panel">
+  <div class="health-panel-header">
+    <span class="health-panel-title">🏃 HEALTH</span>
+    <button class="health-close-btn" id="health-close">×</button>
+  </div>
+  
+  <div class="health-content" id="health-content">
+    <!-- Loading -->
+    <div class="health-loading" id="health-loading">
+      <div class="health-loading-spinner"></div>
+      <p>Loading health data...</p>
+    </div>
+    
+    <!-- Metrics -->
+    <div class="health-metrics" id="health-metrics" style="display:none;">
+      <div class="health-card">
+        <div class="health-metric">
+          <span class="health-value" id="h-sleep">--</span>
+          <span class="health-label">Sleep Score</span>
+        </div>
+        <div class="health-metric">
+          <span class="health-value" id="h-battery">--</span>
+          <span class="health-label">Body Battery</span>
+        </div>
+        <div class="health-metric">
+          <span class="health-value" id="h-hr">--</span>
+          <span class="health-label">Resting HR</span>
+        </div>
+        <div class="health-metric">
+          <span class="health-value" id="h-stress">--</span>
+          <span class="health-label">Stress</span>
+        </div>
+      </div>
+      
+      <div class="health-workout" id="health-workout-card">
+        <div class="health-workout-header">Today's Workout</div>
+        <div class="health-workout-type" id="h-workout-type">--</div>
+        <div class="health-workout-detail" id="h-workout-desc">Run workout_coach.py to generate</div>
+        <div class="health-workout-meta">
+          <span id="h-workout-duration">-- min</span> · 
+          <span id="h-workout-intensity">--</span>
+        </div>
+        <div class="health-workout-reason" id="h-workout-reason"></div>
+      </div>
+      
+      <div class="health-actions">
+        <button class="health-btn" id="health-refresh-btn">🔄 Refresh</button>
+        <button class="health-btn health-btn-secondary" id="health-fetch-btn">📥 Fetch Garmin</button>
+      </div>
+      
+      <div class="health-last-updated" id="health-last-updated"></div>
+    </div>
+    
+    <!-- Error -->
+    <div class="health-error" id="health-error" style="display:none;">
+      <p>No health data available.</p>
+      <button class="health-btn" id="health-setup-btn">Set Up Health Tracking</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHAT PANEL (slides from RIGHT) -->
 <div class="chat-panel" id="chat-panel">
   <div class="chat-panel-header">
     <span class="chat-panel-title">CHAT LOG</span>
-    <!-- memory badge -->
     <span class="memory-count" id="memory-count">0</span>
     <span class="chat-panel-title" style="margin-left:4px">MEM</span>
     <button class="chat-close-btn" id="chat-close">×</button>
   </div>
 
-  <!-- messages scroll area -->
   <div class="messages" id="messages">
     <div class="empty-state" id="empty-state">
       <div class="empty-title">Hello. I'm <span>Jarvis</span>.</div>
@@ -92,7 +164,6 @@
     </div>
   </div>
 
-  <!-- memory sidebar inside chat panel -->
   <div class="memory-section">
     <div class="sidebar-header">
       <span>MEMORY</span>
@@ -104,13 +175,12 @@
   </div>
 </div>
 
-<!-- AMENDED: status dot kept but hidden, used by script.js internally -->
+<!-- HIDDEN STATUS -->
 <div style="display:none">
   <div id="status-dot" class="status-dot offline"></div>
   <span id="status-text">offline</span>
 </div>
 
-<!-- index.html -->
 <script type="module" src="main.js"></script>
 </body>
 </html>

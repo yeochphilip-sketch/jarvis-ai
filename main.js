@@ -34,6 +34,7 @@ import { speak, stopSpeaking               } from './speech.js';
 import { initSpeechRecognition,
          startListening, stopListening     } from './recognition.js';
 import { UI, showUserLine, clearUserLine   } from './ui.js';
+import { Health } from './health.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

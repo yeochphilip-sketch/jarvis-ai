@@ -869,3 +869,85 @@ if __name__ == '__main__':
     )
     print('Jarvis server running on https://localhost:5001')
     app.run(port=5001, debug=False, ssl_context=ctx)
+# ═════════════════════════════════════════════════════════════════
+# HEALTH & WORKOUT ROUTES (Garmin Integration)
+# ═════════════════════════════════════════════════════════════════
+
+import json
+import os
+from datetime import datetime
+
+HEALTH_DIR = os.path.expanduser('~/jarvis/data/health')
+WORKOUT_DIR = os.path.expanduser('~/jarvis/data/workouts')
+
+@app.route('/health/today', methods=['GET'])
+def health_today():
+    """Return today's Garmin health data."""
+    today = datetime.now().strftime('%Y-%m-%d')
+    health_path = os.path.join(HEALTH_DIR, f'{today}.json')
+    
+    if not os.path.exists(health_path):
+        return jsonify({'error': 'No health data for today. Run garmin_fetcher.py first.'}), 404
+    
+    with open(health_path) as f:
+        data = json.load(f)
+    
+    # Extract key metrics safely
+    sleep = data.get('sleep', {})
+    sleep_dto = sleep.get('dailySleepDTO', {}) if isinstance(sleep, dict) else {}
+    
+    return jsonify({
+        'date': today,
+        'sleep_score': sleep_dto.get('sleepScore'),
+        'sleep_duration': sleep_dto.get('sleepTimeInBed'),
+        'body_battery': data.get('body_battery'),
+        'resting_hr': data.get('resting_hr'),
+        'stress': data.get('stress'),
+        'training_status': data.get('training_status'),
+        'activities': data.get('activities', [])[:1]  # last activity only
+    })
+
+@app.route('/workout/today', methods=['GET'])
+def workout_today():
+    """Return today's AI-generated workout."""
+    today = datetime.now().strftime('%Y-%m-%d')
+    workout_path = os.path.join(WORKOUT_DIR, f'{today}.json')
+    
+    if not os.path.exists(workout_path):
+        return jsonify({'error': 'No workout plan for today. Run workout_coach.py first.'}), 404
+    
+    with open(workout_path) as f:
+        workout = json.load(f)
+    
+    return jsonify(workout)
+
+@app.route('/health/refresh', methods=['POST'])
+def health_refresh():
+    """Trigger garmin_fetcher.py and workout_coach.py to refresh data."""
+    import subprocess
+    
+    try:
+        # Run fetcher
+        result_fetch = subprocess.run(
+            ['python3', os.path.expanduser('~/jarvis/garmin_fetcher.py')],
+            capture_output=True, text=True, timeout=60
+        )
+        
+        # Run workout coach
+        result_workout = subprocess.run(
+            ['python3', os.path.expanduser('~/jarvis/workout_coach.py')],
+            capture_output=True, text=True, timeout=120
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'fetcher': result_fetch.stdout.strip(),
+            'workout': result_workout.stdout.strip(),
+            'errors': {
+                'fetcher': result_fetch.stderr.strip() if result_fetch.returncode != 0 else None,
+                'workout': result_workout.stderr.strip() if result_workout.returncode != 0 else None
+            }
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
