@@ -1,0 +1,7 @@
+{
+  "workout_type": "rest",
+  "duration_minutes": 30,
+  "description": "Take it easy for 30 minutes to help recover from the day.",
+  "intensity": "low",
+  "reasoning": "Sleep score < 70 and resting HR 5+ bpm above baseline, indicating a need for rest."
+}
