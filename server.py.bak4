@@ -1,3 +1,6 @@
+# DEBUG: verify this file is loaded
+print("LOADED: /Users/philipyeo/jarvis/server.py")
+
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import subprocess, os, time, threading, sqlite3, re
@@ -860,6 +863,16 @@ def spotify_api(method, endpoint, body=None):
         return None, f'Spotify API error {e.code}'
 
 # ─────────────────────────────────────────────
+if __name__ == '__main__':
+    import ssl
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(
+        '/Users/philipyeo/jarvis/127.0.0.1+1.pem',
+        '/Users/philipyeo/jarvis/127.0.0.1+1-key.pem'
+    )
+    print('Jarvis server running on https://localhost:5001')
+    app.run(port=5001, debug=False, ssl_context=ctx)
+
 # ═════════════════════════════════════════════════════════════════
 # HEALTH & WORKOUT ROUTES (Garmin Integration)
 # ═════════════════════════════════════════════════════════════════
@@ -873,6 +886,7 @@ WORKOUT_DIR = _os.path.expanduser('~/jarvis/data/workouts')
 
 @app.route('/health/today', methods=['GET'])
 def health_today():
+    print("[DEBUG] health_today route hit")
     """Return today's Garmin health data."""
     today = _datetime.now().strftime('%Y-%m-%d')
     health_path = _os.path.join(HEALTH_DIR, f'{today}.json')
@@ -928,19 +942,6 @@ def health_refresh():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/health/<date>', methods=['GET'])
-def health_by_date(date):
-    path = f"data/health/{date}.json"
-    if not os.path.exists(path):
-        return jsonify({"error": "No data"}), 404
-    with open(path) as f:
-        return jsonify(json.load(f))
-
-@app.route('/health/weekly', methods=['GET'])
-def health_weekly():
-    # Aggregate last 7 days of data
-    ...
-    
 # ═════════════════════════════════════════════════════════════════
 # MAIN
 # ═════════════════════════════════════════════════════════════════

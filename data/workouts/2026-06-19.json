@@ -1,0 +1,9 @@
+```json
+{
+  "workout_type": "rest",
+  "duration_minutes": 30,
+  "description": "Take a rest day or do an easy 30-minute jog to help recover from high stress levels.",
+  "intensity": "low",
+  "reasoning": "High stress level (15) suggests a need for recovery."
+}
+```

@@ -846,3 +846,6 @@ textarea::placeholder { color: var(--text-dim); }
     transform: translateX(380px) translateX(-100%);
   }
 }
+
+.health-workout.rest-day { border-left-color: #f44336; }
+.health-workout.high-intensity { border-left-color: #ff9800; }

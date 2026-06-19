@@ -156,6 +156,16 @@ export function detectIntent(text) {
   return { action: 'spotify', target: 'current track' };
   }
 
+  // In detectIntent()
+  if (/my health|health data|biometrics|how did i sleep/.test(text)) {
+    return { type: 'health', action: 'show' };
+  }
+  if (/today's workout|what should i run|training plan/.test(text)) {
+    return { type: 'workout', action: 'show' };
+  }
+  if (/refresh health|sync garmin|update health/.test(text)) {
+    return { type: 'health', action: 'refresh' };
+  }
   return null;
 }
 
@@ -248,6 +258,15 @@ export async function callServer(endpoint, data) {
 
 // ── Execute ───────────────────────────────────────────────────────────────────
 export async function executeIntent(intent) {
+  case 'health':
+  DOM.healthPanel.classList.add('open');
+  if (intent.action === 'refresh') {
+    await fetch(`${CONFIG.flaskUrl}/health/refresh`, {method: 'POST'});
+  }
+  Health.loadData();
+  speak("Here's your health data.");
+  break;
+  
   if (intent.action === 'gmail_triage') {
     await handleGmailTriage();
     return;

@@ -6,12 +6,12 @@
   <title>Jarvis</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 
 <!-- INIT MODAL -->
-<div class="modal-overlay" id="modal">
+<div class="modal-overlay" id="modal" style="display:none">
   <div class="modal">
     <div class="modal-title"><span>JARVIS</span> // INIT</div>
     <p class="modal-sub">
@@ -45,14 +45,14 @@
   <!-- BOTTOM BAR: Health | Mic | Input | Chat -->
   <div class="orb-bar">
     <!-- Health toggle (left side) -->
-    <button class="orb-btn health-toggle-btn" id="health-toggle" disabled title="Health data">
+    <button class="orb-btn health-toggle-btn" id="health-toggle" title="Health data">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M8 14s-4-3.5-4-6a4 4 0 018 0c0 2.5-4 6-4 6z"/>
       </svg>
     </button>
     
     <!-- Mic -->
-    <button class="orb-btn mic-btn" id="mic-btn" disabled title="Click to speak">
+    <button class="orb-btn mic-btn" id="mic-btn" title="Click to speak">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <rect x="5" y="1" width="6" height="9" rx="3"/>
         <path d="M2 8a6 6 0 0012 0M8 14v2"/>
@@ -61,7 +61,7 @@
     
     <!-- Input -->
     <div class="orb-input-wrap">
-      <textarea id="input" rows="1" placeholder="Ask Jarvis anything..." disabled></textarea>
+      <textarea id="input" rows="1" placeholder="Ask Jarvis anything..."></textarea>
       <button class="send-btn" id="send-btn" disabled>
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 8h10M9 4l4 4-4 4"/>
@@ -70,7 +70,7 @@
     </div>
     
     <!-- Chat toggle (right side) -->
-    <button class="orb-btn chat-toggle-btn" id="chat-toggle" disabled title="Toggle chat">
+    <button class="orb-btn chat-toggle-btn" id="chat-toggle" title="Toggle chat">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M14 10c0 .667-.333 1-1 1H4l-3 3V3c0-.667.333-1 1-1h11c.667 0 1 .333 1 1v7z"/>
       </svg>
@@ -181,6 +181,6 @@
   <span id="status-text">offline</span>
 </div>
 
-<script type="module" src="main.js"></script>
+<script type="module" src="main.js?v=2"></script>
 </body>
 </html>

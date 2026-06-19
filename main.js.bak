@@ -271,7 +271,6 @@ document.getElementById('key-submit').addEventListener('click', () => {
   });
   DOM.input.focus();
   initSpeechRecognition(sendMessage);
-  Health.init();
 });
 // ── Auto-init: skip modal, start Jarvis immediately ─────────────────────────
 
