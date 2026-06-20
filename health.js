@@ -11,57 +11,78 @@ export const Health = {
       if (this.closeBtn) this.closeBtn.addEventListener('click', () => this.close());
     }, 100);
   },
-  
+
   toggle() {
     if (!this.panel) return;
     this.panel.classList.toggle('open');
     if (this.panel.classList.contains('open')) this.loadData();
   },
-  
+
   close() {
     if (this.panel) this.panel.classList.remove('open');
   },
-  
+
+  async refreshFromGarmin() {
+    this.showLoading();
+    try {
+      const res = await fetch(API_BASE + '/health/refresh', {method: 'POST'});
+      const data = await res.json();
+      if (data.status === 'success') {
+        await this.loadData();
+      } else {
+        this.showError('Refresh failed: ' + data.message);
+      }
+    } catch (err) {
+      this.showError('Refresh error: ' + err.message);
+    }
+  },
+
   async loadData() {
     this.showLoading();
     console.log('[Health] fetching...');
     
     try {
-      const res = await fetch(API_BASE + '/health/today');
-      console.log('[Health] status:', res.status);
+      const [healthRes, workoutRes, scheduleRes] = await Promise.all([
+        fetch(API_BASE + '/health/today'),
+        fetch(API_BASE + '/workout/today'),
+        fetch(API_BASE + '/calendar/weekly').catch(() => null)
+      ]);
       
-      if (!res.ok) {
-        const text = await res.text();
-        console.error('[Health] HTTP error:', res.status, text.substring(0, 100));
-        this.showError('Server error: ' + res.status);
-        return;
+      const healthData = healthRes.ok ? await healthRes.json() : null;
+      const workoutData = workoutRes.ok ? await workoutRes.json() : null;
+      
+      const [healthRes, workoutRes, scheduleRes] = await Promise.all([
+      fetch(API_BASE + '/health/today'),
+      fetch(API_BASE + '/workout/today'),
+      fetch(API_BASE + '/calendar/weekly').catch(() => null)
+      ]);
+
+      console.log('[Health] health:', healthData);
+      console.log('[Health] workout:', workoutData);
+      
+      if (healthData && !healthData.error) {
+        this.renderHealth(healthData);
       }
       
-      const data = await res.json();
-      console.log('[Health] got data:', data);
-      
-      if (data.error) {
-        this.showError(data.error);
-        return;
+      if (workoutData && !workoutData.error) {
+        this.renderWorkout(workoutData);
+      } else {
+        this.renderNoWorkout();
       }
       
-      this.render(data);
+      if (scheduleRes && scheduleRes.ok) {
+        const scheduleData = await scheduleRes.json();
+        this.renderSchedule(scheduleData);
+      }
       this.showMetrics();
       
-      // Notification for low sleep score
-      if (data.sleep_score && data.sleep_score < 60) {
-        new Notification("Jarvis", {
-          body: "Sleep score is low today. Consider a rest day."
-        });
-      }
-      
     } catch (err) {
-      console.error('[Health] fetch error:', err);
-      this.showError('Connection failed: ' + err.message);
+      console.error('[Health] error:', err);
+      this.showError('Failed to load data');
     }
   },
-  
-  render(data) {
+
+  renderHealth(data) {
     const set = (id, val) => {
       const el = document.getElementById(id);
       if (el) el.textContent = val ?? '--';
@@ -71,7 +92,66 @@ export const Health = {
     set('h-hr', data.resting_hr);
     set('h-stress', data.stress);
   },
-  
+
+  renderWorkout(data) {
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val ?? '--';
+    };
+    set('h-workout-type', data.workout_type);
+    set('h-workout-desc', data.description);
+    set('h-workout-duration', (data.duration_minutes ?? '--') + ' min');
+    set('h-workout-intensity', data.intensity);
+    set('h-workout-reason', data.reasoning);
+    
+    const card = document.getElementById('health-workout-card');
+    if (card) {
+      card.className = 'health-workout' + (data.workout_type === 'rest' ? ' rest-day' : '');
+    }
+  },
+
+  renderSchedule(data) {
+  const renderWeek = (events, containerId) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    if (!events || events.length === 0) {
+      container.innerHTML = '<div class="schedule-empty">No events</div>';
+      return;
+    }
+    
+    container.innerHTML = events.map(e => {
+      const date = new Date(e.start);
+      const dateStr = date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+      });
+      const timeStr = e.start.includes('T') ? date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit'
+      }) : '';
+      
+      return `
+        <div class="schedule-event">
+          <div class="schedule-event-title">${e.title}</div>
+          <div class="schedule-event-time">${dateStr}${timeStr ? ' · ' + timeStr : ''}</div>
+          ${e.location ? `<div class="schedule-event-location">📍 ${e.location}</div>` : ''}
+        </div>
+      `;
+      }).join('');
+    };
+    
+    renderWeek(data.this_week, 'schedule-this-week');
+    renderWeek(data.next_week, 'schedule-next-week');
+  }
+  renderNoWorkout() {
+    const type = document.getElementById('h-workout-type');
+    const desc = document.getElementById('h-workout-desc');
+    if (type) type.textContent = 'Not Generated';
+    if (desc) desc.textContent = 'Run workout_coach.py to generate';
+  },
+
   showLoading() {
     const l = document.getElementById('health-loading');
     const m = document.getElementById('health-metrics');
@@ -80,7 +160,7 @@ export const Health = {
     if (m) m.style.display = 'none';
     if (e) e.style.display = 'none';
   },
-  
+
   showMetrics() {
     const l = document.getElementById('health-loading');
     const m = document.getElementById('health-metrics');
@@ -89,7 +169,7 @@ export const Health = {
     if (m) m.style.display = 'block';
     if (e) e.style.display = 'none';
   },
-  
+
   showError(msg) {
     const l = document.getElementById('health-loading');
     const m = document.getElementById('health-metrics');

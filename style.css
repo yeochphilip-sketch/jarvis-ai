@@ -849,3 +849,197 @@ textarea::placeholder { color: var(--text-dim); }
 
 .health-workout.rest-day { border-left-color: #f44336; }
 .health-workout.high-intensity { border-left-color: #ff9800; }
+
+/* Button press feedback */
+.orb-btn:active,
+.orb-btn.active {
+  transform: scale(0.92);
+  opacity: 0.8;
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+.health-btn:active,
+.health-btn.active {
+  transform: scale(0.92);
+  background: rgba(76, 175, 80, 0.2);
+}
+
+.send-btn:active,
+.send-btn.active {
+  transform: scale(0.92);
+  background: rgba(76, 175, 80, 0.3);
+}
+
+/* Add ripple effect on click */
+.orb-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.3s ease, height 0.3s ease, opacity 0.3s ease;
+  opacity: 0;
+}
+
+.orb-btn:active::after {
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+}
+
+/* Scrollable health panel */
+.health-panel {
+  overflow-y: auto;
+  max-height: 100vh;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(76, 175, 80, 0.3) transparent;
+}
+
+.health-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.health-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.health-panel::-webkit-scrollbar-thumb {
+  background: rgba(76, 175, 80, 0.3);
+  border-radius: 3px;
+}
+
+/* Schedule styling */
+.health-schedule {
+  margin-top: 16px;
+  padding: 16px;
+  background: rgba(26, 26, 26, 0.8);
+  border-radius: 12px;
+}
+
+.health-schedule-header {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #4CAF50;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.health-schedule-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule-event {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid #4CAF50;
+}
+
+.schedule-event-title {
+  font-weight: 500;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.schedule-event-time {
+  font-size: 0.85em;
+  color: #888;
+}
+
+.schedule-event-location {
+  font-size: 0.8em;
+  color: #4CAF50;
+  margin-top: 4px;
+}
+
+.schedule-empty {
+  color: #666;
+  font-style: italic;
+  padding: 12px;
+}
+
+/* Schedule inside health panel */
+.health-schedule {
+  margin-top: 16px;
+  padding: 16px;
+  background: rgba(26, 26, 26, 0.8);
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.health-schedule-header {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #4CAF50;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.health-schedule-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule-event {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid #4CAF50;
+}
+
+.schedule-event-title {
+  font-weight: 500;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.schedule-event-time {
+  font-size: 0.85em;
+  color: #888;
+}
+
+.schedule-event-location {
+  font-size: 0.8em;
+  color: #4CAF50;
+  margin-top: 4px;
+}
+
+.schedule-empty {
+  color: #666;
+  font-style: italic;
+  padding: 12px;
+}
+
+/* Button press feedback */
+.orb-btn:active, .orb-btn.active {
+  transform: scale(0.92);
+  opacity: 0.8;
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+/* Scrollable health panel */
+.health-panel {
+  overflow-y: auto;
+  max-height: 100vh;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(76, 175, 80, 0.3) transparent;
+}
+
+.health-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.health-panel::-webkit-scrollbar-thumb {
+  background: rgba(76, 175, 80, 0.3);
+  border-radius: 3px;
+}

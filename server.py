@@ -940,7 +940,58 @@ def health_by_date(date):
 def health_weekly():
     # Aggregate last 7 days of data
     ...
+
+@app.route('/calendar/weekly', methods=['GET'])
+def calendar_weekly():
+    """Return this week and next week's calendar events."""
+    import datetime
+    from googleapiclient.discovery import build
     
+    try:
+        service = build('calendar', 'v3', credentials=get_credentials())
+        
+        now = datetime.datetime.now(datetime.timezone.utc)
+        week_start = now - datetime.timedelta(days=now.weekday())
+        week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+        next_week_start = week_start + datetime.timedelta(days=7)
+        next_week_end = next_week_start + datetime.timedelta(days=7)
+        week_end = next_week_start
+        
+        # This week
+        this_week_events = service.events().list(
+            calendarId='primary',
+            timeMin=week_start.isoformat(),
+            timeMax=week_end.isoformat(),
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute().get('items', [])
+        
+        # Next week
+        next_week_events = service.events().list(
+            calendarId='primary',
+            timeMin=next_week_start.isoformat(),
+            timeMax=next_week_end.isoformat(),
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute().get('items', [])
+        
+        def format_event(e):
+            start = e['start'].get('dateTime', e['start'].get('date', ''))
+            return {
+                'title': e.get('summary', 'No title'),
+                'start': start,
+                'location': e.get('location', ''),
+                'description': e.get('description', '')[:100]
+            }
+        
+        return jsonify({
+            'this_week': [format_event(e) for e in this_week_events],
+            'next_week': [format_event(e) for e in next_week_events]
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+        
 # ═════════════════════════════════════════════════════════════════
 # MAIN
 # ═════════════════════════════════════════════════════════════════

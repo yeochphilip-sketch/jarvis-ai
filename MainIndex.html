@@ -58,6 +58,18 @@
         <path d="M2 8a6 6 0 0012 0M8 14v2"/>
       </svg>
     </button>
+
+    <!-- Add after health-workout-card -->
+    <div class="health-schedule" id="health-schedule">
+      <div class="health-schedule-header">This Week</div>
+      <div class="health-schedule-grid" id="schedule-this-week">
+        <!-- Populated by JS -->
+      </div>
+      <div class="health-schedule-header">Next Week</div>
+      <div class="health-schedule-grid" id="schedule-next-week">
+        <!-- Populated by JS -->
+      </div>
+    </div>
     
     <!-- Input -->
     <div class="orb-input-wrap">
@@ -137,6 +149,16 @@
         <button class="health-btn health-btn-secondary" id="health-fetch-btn">📥 Fetch Garmin</button>
       </div>
       
+      <div class="health-schedule" id="health-schedule">
+        <div class="health-schedule-header">This Week</div>
+        <div class="health-schedule-grid" id="schedule-this-week">
+          <div class="schedule-empty">Loading schedule...</div>
+        </div>
+        <div class="health-schedule-header" style="margin-top:16px;">Next Week</div>
+        <div class="health-schedule-grid" id="schedule-next-week">
+          <div class="schedule-empty">Loading schedule...</div>
+        </div>
+      </div>
       <div class="health-last-updated" id="health-last-updated"></div>
     </div>
     
