@@ -47,6 +47,7 @@ def fetch_today():
         data["hrv"] = hrv
     except:
         pass
+
     os.makedirs("data/health", exist_ok=True)
     with open(f"data/health/{today}.json", "w") as f:
         json.dump(data, f, indent=2, default=str)

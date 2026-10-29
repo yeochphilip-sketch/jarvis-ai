@@ -212,9 +212,8 @@ def speak():
 # ─────────────────────────────────────────────
 @app.route('/timer', methods=['POST'])
 def timer():
-    try:
-        seconds = int(request.json.get('target', 0))
-    except ValueError:
+    seconds = parse_countdown_seconds(str(request.json.get('target', '0')))
+    if not seconds:
         return jsonify({'result': 'Invalid timer value'}), 400
 
     def run():
@@ -226,6 +225,274 @@ def timer():
 
     threading.Thread(target=run, daemon=True).start()
     return jsonify({'result': f'Timer set for {seconds} seconds'})
+
+
+# ─────────────────────────────────────────────
+# ALARM
+# ─────────────────────────────────────────────
+# Alarms are persistent (survive server restarts) and stored in
+# ~/jarvis_data/alarms.json. When one fires, the alarm loop plays
+# ~/jarvis/alarm.{mp3,wav,m4a,...} on the Mac speakers via afplay,
+# looping until the user stops it (or a safety cap is hit).
+ALARMS_FILE      = os.path.expanduser('~/jarvis_data/alarms.json')
+ALARM_RECORDINGS = [
+    os.path.expanduser(f'~/jarvis/alarm.{ext}')
+    for ext in ('mp3', 'wav', 'm4a', 'aiff', 'aif', 'caf')
+]
+MAX_RING_SECONDS = 600  # safety cap: auto-stop after 10 minutes
+
+_ringing = {'proc': None, 'alarm_id': None, 'started_at': None}
+
+
+def load_alarms():
+    if not os.path.exists(ALARMS_FILE):
+        return []
+    try:
+        with open(ALARMS_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def save_alarms(alarms):
+    os.makedirs(os.path.dirname(ALARMS_FILE), exist_ok=True)
+    with open(ALARMS_FILE, 'w') as f:
+        json.dump(alarms, f, indent=2)
+
+
+def find_alarm_recording():
+    for p in ALARM_RECORDINGS:
+        if os.path.exists(p):
+            return p
+    return None
+
+
+_NUM_WORDS = {
+    'oh': 0, 'o': 0, 'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+    'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10, 'eleven': 11,
+    'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15, 'sixteen': 16,
+    'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20,
+    'thirty': 30, 'forty': 40, 'fifty': 50,
+}
+
+
+def words_to_digits(target):
+    """Convert spoken clock words into digits:
+    'nineteen thirty' -> '19 30', 'nineteen thirty five' -> '19 35',
+    'seven 30 pm' -> '7 30 pm'. Numeric tokens pass through untouched."""
+    out  = []
+    nums = []
+    def flush():
+        if nums:
+            if len(nums) >= 3:
+                # hour + tens + ones, e.g. [19, 30, 5] -> '19 35', [1, 0, 5] -> '1 05'
+                out.append(f'{nums[0]} {nums[1] + nums[2]:02d}')
+            elif len(nums) == 2:
+                out.append(f'{nums[0]} {nums[1]:02d}')
+            else:
+                out.append(str(nums[0]))
+            nums.clear()
+    for tok in target.split():
+        if tok in _NUM_WORDS:
+            nums.append(_NUM_WORDS[tok])
+        else:
+            flush()
+            out.append(tok)
+    flush()
+    return ' '.join(out)
+
+
+def parse_countdown_seconds(target):
+    """Extract total seconds from '5 minutes', 'five minutes', 'in 2 hours 5
+    minutes', or '300'. Returns None if no countdown duration is present."""
+    target = (target or '').strip().lower()
+    target = words_to_digits(target)
+    if target.isdigit():
+        return int(target)
+    units = re.findall(r'(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)', target)
+    if not units:
+        return None
+    total = 0
+    for n, u in units:
+        n = int(n)
+        if u.startswith('s'):
+            total += n
+        elif u.startswith('m'):
+            total += n * 60
+        elif u.startswith('h'):
+            total += n * 3600
+    return total if total > 0 else None
+
+
+def _next_occurrence(hour, minute, ampm, target):
+    """Compute the next datetime matching hour:minute (local time), rolling to
+    tomorrow if that time already passed today (or 'tomorrow' is requested)."""
+    if hour > 23 or minute > 59:
+        return None
+    if ampm:
+        if ampm == 'pm' and hour < 12:
+            hour += 12
+        if ampm == 'am' and hour == 12:
+            hour = 0
+    # No am/pm: bare 13-23 is 24h time; bare 1-11 defaults to AM (wake-up)
+    now = datetime.now()
+    due = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if 'tomorrow' in target:
+        due += timedelta(days=1)
+    elif due <= now:
+        due += timedelta(days=1)
+    return due
+
+
+def parse_alarm_target(target):
+    """Parse 'in 10 minutes', '7:30', '7:30 AM', '19:30', '1930',
+    'tomorrow 7am', or a bare number of seconds into an absolute due
+    datetime (local time). Spoken forms ('nineteen thirty') are supported."""
+    target = (target or '').strip().lower()
+    if not target:
+        return None
+    target = words_to_digits(target)
+
+    # Compact 24h clock with no separator: "1930" -> 19:30 (spoken transcription)
+    if re.fullmatch(r'\d{4}', target):
+        hour, minute = int(target[:2]), int(target[2:])
+        due = _next_occurrence(hour, minute, None, target)
+        if due:
+            return due
+
+    # Countdown: "in 10 minutes", "2 hours 5 minutes", plain seconds "300"
+    secs = parse_countdown_seconds(target)
+    if secs is not None:
+        return datetime.now() + timedelta(seconds=secs)
+
+    # Clock time: "7:30", "7:30 am", "7am", "19:30", "1930", "19 30", "at 7"
+    m = (re.search(r'(?:at\s+|to\s+)?(\d{1,2})[:. ](\d{2})\s*(am|pm)?', target)
+         or re.search(r'(?:at\s+|to\s+)?(\d{1,2})(\d{2})\s*(am|pm)?', target)
+         or re.search(r'(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', target))
+    if m:
+        return _next_occurrence(int(m.group(1)), int(m.group(2) or 0), m.group(3), target)
+
+    return None
+
+
+@app.route('/alarm', methods=['POST'])
+def set_alarm():
+    target = request.json.get('target', '').strip()
+    due    = parse_alarm_target(target)
+    if not due:
+        return jsonify({'result': "I couldn't understand that time. Try 'set alarm for 7:30 AM' or 'alarm in 10 minutes'."}), 400
+
+    alarms = load_alarms()
+    alarms.append({
+        'id'        : f"alarm_{int(time.time() * 1000)}",
+        'due_at'    : due.isoformat(timespec='seconds'),
+        'fired'     : False,
+        'ringing'   : False,
+        'created_at': datetime.now().isoformat(timespec='seconds'),
+    })
+    save_alarms(alarms)
+    return jsonify({'result': f"Alarm set for {due.strftime('%I:%M %p on %A')}."})
+
+
+@app.route('/alarms', methods=['GET'])
+def list_alarms():
+    return jsonify(load_alarms())
+
+
+@app.route('/alarm/stop', methods=['POST'])
+def stop_alarm():
+    _stop_ringing()
+    alarms = load_alarms()
+    for a in alarms:
+        if a.get('ringing'):
+            a['ringing'] = False
+    save_alarms(alarms)
+    return jsonify({'result': 'Alarm stopped.'})
+
+
+@app.route('/alarm/cancel', methods=['POST'])
+def cancel_alarm():
+    """Cancel a specific alarm by id (from the health panel list)."""
+    alarm_id = request.json.get('id', '')
+    alarms   = load_alarms()
+    removed  = [a for a in alarms if a.get('id') != alarm_id]
+    if len(removed) == len(alarms):
+        return jsonify({'result': 'Alarm not found.'}), 404
+    # Stop ringing if the cancelled alarm was the one ringing
+    if _ringing.get('alarm_id') == alarm_id:
+        _stop_ringing()
+    save_alarms(removed)
+    return jsonify({'result': 'Alarm cancelled.'})
+
+
+def _start_ringing(alarm):
+    recording = find_alarm_recording()
+    if recording:
+        cmd = ['sh', '-c', 'while true; do afplay "$1" || exit 1; sleep 2; done', 'sh', recording]
+    else:
+        # No recording on disk — fall back to Jarvis's voice + a notification
+        cmd = ['sh', '-c', 'while true; do say -v Daniel -r 165 "Wake up"; sleep 3; done']
+    _ringing['proc']       = subprocess.Popen(cmd)
+    _ringing['alarm_id']   = alarm.get('id')
+    _ringing['started_at'] = time.time()
+    print(f'[alarm] ringing: {alarm.get("due_at")}')
+
+
+def _stop_ringing():
+    if _ringing['proc']:
+        try:
+            _ringing['proc'].terminate()
+        except Exception:
+            pass
+        _ringing['proc'] = None
+    _ringing['alarm_id']   = None
+    _ringing['started_at'] = None
+
+
+def alarm_loop():
+    while True:
+        try:
+            alarms = load_alarms()
+            now    = datetime.now()
+            changed = False
+            for a in alarms:
+                if not a.get('fired') and a.get('due_at'):
+                    try:
+                        due = datetime.fromisoformat(a['due_at'])
+                    except ValueError:
+                        continue
+                    if due <= now:
+                        a['fired']   = True
+                        a['ringing'] = True
+                        changed = True
+            if changed:
+                save_alarms(alarms)
+
+            # Safety cap: auto-stop if it has rung too long
+            if _ringing['proc'] and _ringing['started_at'] \
+                    and time.time() - _ringing['started_at'] > MAX_RING_SECONDS:
+                _stop_ringing()
+                for a in load_alarms():
+                    a['ringing'] = False
+                save_alarms(alarms)
+
+            # Start (or restart) ringing for the next due alarm
+            if _ringing['proc'] is None or _ringing['proc'].poll() is not None:
+                current = [a for a in load_alarms() if a.get('ringing')]
+                if current:
+                    _stop_ringing()
+                    _start_ringing(current[0])
+
+            # Clean up alarms that already fired and stopped ringing
+            alarms = load_alarms()
+            if any(a.get('fired') and not a.get('ringing') for a in alarms):
+                save_alarms([a for a in alarms if not (a.get('fired') and not a.get('ringing'))])
+        except Exception as e:
+            print(f'[alarm] error: {e}')
+        time.sleep(5)
+
+
+threading.Thread(target=alarm_loop, daemon=True).start()
 
 
 # ─────────────────────────────────────────────
@@ -930,16 +1197,34 @@ def health_refresh():
 
 @app.route('/health/<date>', methods=['GET'])
 def health_by_date(date):
-    path = f"data/health/{date}.json"
-    if not os.path.exists(path):
+    path = _os.path.join(HEALTH_DIR, f'{date}.json')
+    if not _os.path.exists(path):
         return jsonify({"error": "No data"}), 404
     with open(path) as f:
-        return jsonify(json.load(f))
+        return jsonify(_json.load(f))
 
 @app.route('/health/weekly', methods=['GET'])
 def health_weekly():
-    # Aggregate last 7 days of data
-    ...
+    """Aggregate the last 7 days of Garmin health data."""
+    days = []
+    for i in range(7):
+        d = (_datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+        path = _os.path.join(HEALTH_DIR, f'{d}.json')
+        if not _os.path.exists(path):
+            continue
+        with open(path) as f:
+            data = _json.load(f)
+        sleep = data.get('sleep', {}).get('dailySleepDTO', {}) if isinstance(data.get('sleep'), dict) else {}
+        days.append({
+            'date': d,
+            'sleep_score': sleep.get('sleepScore'),
+            'body_battery': data.get('body_battery'),
+            'resting_hr': data.get('resting_hr'),
+            'stress': data.get('stress'),
+        })
+    if not days:
+        return jsonify({'error': 'No health data found. Run garmin_fetcher.py first.'}), 404
+    return jsonify({'days': days})
 
 @app.route('/calendar/weekly', methods=['GET'])
 def calendar_weekly():
@@ -948,7 +1233,7 @@ def calendar_weekly():
     from googleapiclient.discovery import build
     
     try:
-        service = build('calendar', 'v3', credentials=get_credentials())
+        service = build('calendar', 'v3', credentials=get_google_creds())
         
         now = datetime.datetime.now(datetime.timezone.utc)
         week_start = now - datetime.timedelta(days=now.weekday())

@@ -2,7 +2,9 @@
 import { CONFIG } from './config.js';
 import { STATE  } from './state.js';
 import { UI     } from './ui.js';
+import { DOM    } from './dom.js';
 import { speak  } from './speech.js';
+import { Health } from './health.js';
 
 
 // ── Step 1: Regex (fast path) ─────────────────────────────────────────────────
@@ -166,6 +168,18 @@ export function detectIntent(text) {
   if (/refresh health|sync garmin|update health/.test(text)) {
     return { type: 'health', action: 'refresh' };
   }
+
+  // Timer — "set timer for 5 minutes", "start a timer for 30 seconds", "timer for 2 hours"
+  const timerMatch = t.match(/(?:set\s+(?:a\s+)?timer|start\s+(?:a\s+)?timer|timer)\s+(?:for\s+|in\s+)?(.+)$/);
+  if (timerMatch) return { action: 'timer', target: timerMatch[1].trim() };
+
+  // Alarm — stop first so "stop the alarm" never falls through
+  if (t.match(/(?:stop|cancel|dismiss|turn\s+off)\s+(?:the\s+)?alarm/)) {
+    return { action: 'alarm_stop', target: '' };
+  }
+  const alarmMatch = t.match(/(?:set\s+(?:an?\s+)?alarm|wake\s+me\s+up|alarm)\s+(?:for\s+|at\s+|in\s+|to\s+)?(.+)$/);
+  if (alarmMatch) return { action: 'alarm', target: alarmMatch[1].trim() };
+
   return null;
 }
 
@@ -184,6 +198,8 @@ Respond ONLY with valid JSON. No explanation. No markdown. Examples:
 {"type":"task","action":"open","target":"https://youtube.com"}
 {"type":"task","action":"search","target":"latest news"}
 {"type":"task","action":"timer","target":"300"}
+{"type":"task","action":"alarm","target":"7:30 AM"}
+{"type":"task","action":"alarm","target":"in 10 minutes"}
 {"type":"task","action":"files","target":"list:~/Desktop"}
 {"type":"task","action":"volume","target":"50"}
 {"type":"task","action":"brightness","target":"70"}
@@ -198,8 +214,9 @@ Respond ONLY with valid JSON. No explanation. No markdown. Examples:
 {"type":"task","action":"websearch","target":"latest news today"}
 {"type":"conversation"}
 
-Valid actions are: open, search, timer, files, volume, brightness, sysinfo, datetime, websearch.
+Valid actions are: open, search, timer, alarm, files, volume, brightness, sysinfo, datetime, websearch.
 For timer, target must be total seconds as a string.
+For alarm, target is the natural-language alarm time, e.g. "7:30 AM", "19:30", or "in 10 minutes".
 For files, target must be "list:~/Desktop" or "list:~/Documents".
 For volume and brightness, target must be a number 0-100 as a string.
 For sysinfo, target must be one of: battery, storage, memory, cpu, temperature, uptime, network.
@@ -299,16 +316,6 @@ export async function executeIntent(intent) {
     tomorrow: intent.tomorrow || false
   });
 
-  if (intent.action === 'spotify_login') {
-  const res    = await fetch(`${CONFIG.flaskUrl}/spotify/login`);
-  const data   = await res.json();
-  window.open(data.url, '_blank');
-  const msg = 'Opening Spotify login. Authenticate and come back.';
-  UI.addMessage('assistant', msg);
-  speak(msg);
-  return;
-  }
-
   const summaryRes = await fetch(CONFIG.ollamaUrl, {
     method : 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -341,7 +348,9 @@ export async function executeIntent(intent) {
   const confirmations = {
     open              : `Opened ${intent.target}.`,
     search            : `Searching for ${intent.target}.`,
-    timer             : `Timer set for ${intent.target} seconds.`,
+    timer             : serverResult,
+    alarm             : serverResult,
+    alarm_stop        : serverResult,
     files             : serverResult,
     volume            : `Volume set to ${intent.target}%.`,
     brightness        : `Brightness set to ${intent.target}%.`,

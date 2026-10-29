@@ -144,6 +144,46 @@ html, body {
   min-height: 20px;
 }
 
+/* ─── Alarm bar ───────────────────────────────────────────────────────────── */
+.alarm-bar {
+  position: fixed;
+  bottom: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 11;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.alarm-bar.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.alarm-stop-btn {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  color: #fff;
+  background: rgba(220, 60, 60, 0.9);
+  border: 1px solid rgba(255, 120, 120, 0.6);
+  border-radius: 999px;
+  padding: 10px 24px;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(220, 60, 60, 0.45);
+  animation: alarm-pulse 1s ease-in-out infinite;
+}
+
+.alarm-stop-btn:hover {
+  background: rgba(235, 75, 75, 1);
+}
+
+@keyframes alarm-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+
 /* ─── Bottom bar ──────────────────────────────────────────────────────────── */
 .orb-bar {
   position: fixed;
@@ -1018,6 +1058,79 @@ textarea::placeholder { color: var(--text-dim); }
   color: #666;
   font-style: italic;
   padding: 12px;
+}
+
+/* Active alarms in the health panel */
+.health-alarms {
+  margin-top: 16px;
+  padding: 16px;
+  background: rgba(26, 26, 26, 0.8);
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.health-alarms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.health-alarm-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid #4CAF50;
+}
+
+.health-alarm-item.ringing {
+  border-left-color: #f44336;
+  animation: alarm-pulse 1s ease-in-out infinite;
+}
+
+.health-alarm-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.health-alarm-time {
+  font-weight: 500;
+  color: #fff;
+}
+
+.health-alarm-status {
+  font-size: 0.8em;
+  color: #888;
+}
+
+.health-alarm-item.ringing .health-alarm-status {
+  color: #f44336;
+}
+
+.health-alarm-cancel {
+  flex-shrink: 0;
+  background: rgba(244, 67, 54, 0.15);
+  color: #f44336;
+  border: 1px solid rgba(244, 67, 54, 0.4);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.health-alarm-cancel:hover {
+  background: rgba(244, 67, 54, 0.3);
 }
 
 /* Button press feedback */

@@ -42,6 +42,11 @@
     <div class="subtitle-jarvis" id="subtitle-jarvis"></div>
   </div>
 
+  <!-- ALARM BAR (appears above the input when an alarm rings) -->
+  <div class="alarm-bar" id="alarm-bar">
+    <button class="alarm-stop-btn" id="stop-alarm-btn">⏰ STOP ALARM</button>
+  </div>
+
   <!-- BOTTOM BAR: Health | Mic | Input | Chat -->
   <div class="orb-bar">
     <!-- Health toggle (left side) -->
@@ -59,18 +64,6 @@
       </svg>
     </button>
 
-    <!-- Add after health-workout-card -->
-    <div class="health-schedule" id="health-schedule">
-      <div class="health-schedule-header">This Week</div>
-      <div class="health-schedule-grid" id="schedule-this-week">
-        <!-- Populated by JS -->
-      </div>
-      <div class="health-schedule-header">Next Week</div>
-      <div class="health-schedule-grid" id="schedule-next-week">
-        <!-- Populated by JS -->
-      </div>
-    </div>
-    
     <!-- Input -->
     <div class="orb-input-wrap">
       <textarea id="input" rows="1" placeholder="Ask Jarvis anything..."></textarea>
@@ -147,6 +140,12 @@
       <div class="health-actions">
         <button class="health-btn" id="health-refresh-btn">🔄 Refresh</button>
         <button class="health-btn health-btn-secondary" id="health-fetch-btn">📥 Fetch Garmin</button>
+      </div>
+      
+      <!-- Active alarms -->
+      <div class="health-alarms" id="health-alarms" style="display:none;">
+        <div class="health-schedule-header">⏰ Alarms</div>
+        <div class="health-alarms-list" id="health-alarms-list"></div>
       </div>
       
       <div class="health-schedule" id="health-schedule">

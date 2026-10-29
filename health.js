@@ -50,13 +50,7 @@ export const Health = {
       
       const healthData = healthRes.ok ? await healthRes.json() : null;
       const workoutData = workoutRes.ok ? await workoutRes.json() : null;
-      
-      const [healthRes, workoutRes, scheduleRes] = await Promise.all([
-      fetch(API_BASE + '/health/today'),
-      fetch(API_BASE + '/workout/today'),
-      fetch(API_BASE + '/calendar/weekly').catch(() => null)
-      ]);
-
+    
       console.log('[Health] health:', healthData);
       console.log('[Health] workout:', workoutData);
       
@@ -144,7 +138,8 @@ export const Health = {
     
     renderWeek(data.this_week, 'schedule-this-week');
     renderWeek(data.next_week, 'schedule-next-week');
-  }
+  },
+  
   renderNoWorkout() {
     const type = document.getElementById('h-workout-type');
     const desc = document.getElementById('h-workout-desc');

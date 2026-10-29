@@ -35,6 +35,7 @@ import { initSpeechRecognition,
          startListening, stopListening     } from './recognition.js';
 import { UI, showUserLine, clearUserLine   } from './ui.js';
 import { Health } from './health.js';
+import { Alarm  } from './alarm.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -254,25 +255,6 @@ DOM.sendBtn.addEventListener('click', () => {
   if (!STATE.isStreaming) sendMessage();
 });
 
-// Modal dismiss — unlocks the UI and activates the orb
-document.getElementById('key-submit').addEventListener('click', () => {
-  DOM.modal.style.display    = 'none';
-  DOM.input.disabled         = false;
-  DOM.chatToggle.disabled    = false;
-  DOM.statusDot.classList.remove('offline');
-  DOM.statusText.textContent = 'online';
-  STATE.history = [];        // clear any leftover history from a previous session
-  setOrbState('idle');
-  renderMemories();
-  loadServerMemories().then(memories => {
-    STATE.serverMemories = memories;
-    // Auto-briefing fires once after memories are loaded
-    setTimeout(deliverMorningBriefing, 3000);
-  });
-  DOM.input.focus();
-  initSpeechRecognition(sendMessage);
-  Health.init();
-});
 // ── Auto-init: skip modal, start Jarvis immediately ─────────────────────────
 
 (function autoInit() {
@@ -292,6 +274,7 @@ document.getElementById('key-submit').addEventListener('click', () => {
   });
   DOM.input.focus();
   initSpeechRecognition(sendMessage);
+  Alarm.init();
 })();
 
 // Health panel listeners
@@ -304,24 +287,3 @@ if (DOM.healthToggle) {
 if (DOM.healthClose) {
   DOM.healthClose.addEventListener('click', () => DOM.healthPanel.classList.remove('open'));
 }
-
-// Auto-init on page load
-(function autoInit() {
-  DOM.modal.style.display = 'none';
-  DOM.input.disabled = false;
-  DOM.chatToggle.disabled = false;
-  DOM.micBtn.disabled = false;
-  DOM.sendBtn.disabled = false;
-  if (DOM.healthToggle) DOM.healthToggle.disabled = false;
-  DOM.statusDot.classList.remove('offline');
-  DOM.statusText.textContent = 'online';
-  STATE.history = [];
-  setOrbState('idle');
-  renderMemories();
-  loadServerMemories().then(memories => {
-    STATE.serverMemories = memories;
-    setTimeout(deliverMorningBriefing, 3000);
-  });
-  DOM.input.focus();
-  initSpeechRecognition(sendMessage);
-})();
